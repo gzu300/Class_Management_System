@@ -11,6 +11,4 @@ This project is intended to practice MySQL database and SQLalchemy python packag
 ### Student
 1. Submit homework.
 2. View grades for each lesson.
-3. View ranking of grades for each class.(*This is common in China)
-
-
+3. View ranking of grades for each class.(*This is common in China*)
