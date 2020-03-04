@@ -8,14 +8,40 @@ from sqlalchemy import Integer, String, Enum
 
 Base = declarative_base()
 
+class Stu_Courses(Base):
+    __tablename__ = 'student_m2m_course'
+
+    id = Column(Integer, primary_key=True)
+    students_id = Column(Integer, ForeignKey('student.id'))
+    courses_id = Column(Integer, ForeignKey('course.id'))
+
+class Attendance(Base):
+    '''
+    records attendance of each student for each session
+    sessions_lessons m_to_m relationship set. 
+    Additional attributes: homework, present_bool, score
+    '''
+    __tablename__ = 'attendance'
+
+    id = Column(Integer, primary_key=True)
+    homework = Column(String(100))
+    score =  Column(Integer)
+    stu_cou_id = Column(Integer, ForeignKey('student_m2m_course.id'))
+    lessons_id = Column(Integer, ForeignKey('lesson.id'))
+
+    # sessions = relationship('Sessions', back_populates='attendance_m2m_sesssions')
+    # lessons = relationship('Lessons', back_populates='attendance_m2m_lessons')
+
+    
+
 class Teachers(Base):
-    __tablename__ = "teachers"
+    __tablename__ = "teacher"
 
     id = Column(Integer, primary_key=True)
     name = Column(String(20), nullable=False, unique=True)
 
 class Students(Base):
-    __tablename__ = 'students'
+    __tablename__ = 'student'
 
     id = Column(Integer, primary_key=True)
     name = Column(String(20), nullable=False)
@@ -32,42 +58,29 @@ class Lessons(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(10), nullable=False, unique=True)
 
+    attendance = relationship('Stu_Courses', secondary='attendance', backref='lessons')
+
 class Courses(Base):
     __tablename__ = 'course'
 
     id = Column(Integer, primary_key=True)
     name = Column(String(10), nullable=False, unique=True)
 
-class Sessions(Base):
-    '''
-    records sessions for each course.
-    Courses_Lessons m_to_m relationship set. 
-    '''
-    __tablename__ = 'session'
+    students = relationship('Students', secondary='student_m2m_course', backref='courses')
 
-    id = Column(Integer, primary_key=True)
-    courses_id =  Column(Integer, ForeignKey('course.id'))
-    lessons_id = Column(Integer, ForeignKey('lesson.id'))
+# class Sessions(Base):
+#     '''
+#     records sessions for each course.
+#     Courses_Lessons m_to_m relationship set. 
+#     '''
+#     __tablename__ = 'session'
 
-    courses = relationship('Courses', back_populates='sessions_m2m_courses')
-    lessons = relationship('Lessons', back_populates='sessions_m2m_lessons')
+#     id = Column(Integer, primary_key=True)
+#     courses_id =  Column(Integer, ForeignKey('course.id'))
+#     lessons_id = Column(Integer, ForeignKey('lesson.id'))
 
-class Attendance(Base):
-    '''
-    records attendance of each student for each session
-    Sessions_Students m_to_m relationship set. 
-    Additional attributes: homework, present_bool, score
-    '''
-    __tablename__ = 'attendance'
-
-    id = Column(Integer, primary_key=True)
-    homework = Column(String(100))
-    score =  Column(Integer)
-    sessions_id = Column(Integer, ForeignKey('session.id'))
-    courses_id = Column(Integer, ForeignKey('course.id'))
-
-    sessions = relationship('Sessions', back_populates='attendance_m2m_sesssions')
-    lessons = relationship('Lessons', back_populates='attendance_m2m_lessons')
+#     courses = relationship('Courses', back_populates='courses_m2m_lessons')
+#     lessons = relationship('Lessons', back_populates='courses_m2m_lessons')
 
 Base.metadata.create_all(engine)
 
