@@ -3,6 +3,6 @@
 
 from sqlalchemy import create_engine
 
-engine = create_engine('mysql+mysqldb://root:sp880922@localhost/class_management', echo=True)
+engine = create_engine('mysql+mysqldb://root:sp880922@localhost/class_management')
 
-connection = print('connected to db\n', '-'*10)
+connection = print('='*10, 'connected to db', '='*10, sep='\n')

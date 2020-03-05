@@ -9,4 +9,5 @@ from modules.main import Operations
 
 
 if __name__ == '__main__':
-    Operations()
+    op = Operations()
+    op.main()

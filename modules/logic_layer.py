@@ -1,4 +1,7 @@
 #coding=utf-8
+from sqlalchemy.orm import Session
+from conf.setting import engine
+from .create_schema import *
 
 class TeacherMngr(object):
     '''
@@ -10,9 +13,24 @@ class TeacherMngr(object):
     - Record attendance of studnts
     - Give scores for students's hw for every session
     '''
-    def rgt_course(self):
-        return
+    def __init__(self):
+        self.session = Session(bind=engine)
+
+    def rgt_course(self, user, course_name):
+        course_name = course_name.lower()
+        course_exist = self.session.query(Courses.name).filter(Courses.name == course_name).first()
+        if not course_exist:
+            course = Courses(name=course_name)
+            print('='*10, '{0}, {1} has beed registered.'.format(user, course_name), '='*10, sep='\n')
+            self.session.add(course)
+            self.session.commit()
+        else:
+            print('Course \'{0}\' already existed.'.format(course_name))
+
     def rgt_student(self):
+        '''
+        letter q is not a valid selection'
+        '''
         return
     def rgt_session(self):
         return
