@@ -80,7 +80,7 @@ class Courses(Base):
     name = Column(String(10), nullable=False, unique=True)
 
     students = relationship('Students', secondary='student_m2m_course', backref='courses')
-    teachers = relationship('Teachers', secondary=Tea_Courses, backref='courses', lazy='joined')
+    teachers = relationship('Teachers', secondary=Tea_Courses, backref='courses', lazy='joined')#lazy='joined' makes the relationship query a joined table with original tables. to be verified.
 
 # class Sessions(Base):
 #     '''
