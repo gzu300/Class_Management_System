@@ -96,5 +96,7 @@ class Courses(Base):
 #     courses = relationship('Courses', back_populates='courses_m2m_lessons')
 #     lessons = relationship('Lessons', back_populates='courses_m2m_lessons')
 
-Base.metadata.create_all(engine)
+
+
+
 
