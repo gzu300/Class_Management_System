@@ -4,9 +4,10 @@ import sys
 sys.path.insert(0,   '/'.join(os.path.abspath(os.path.dirname(__file__)).split('/')[:-1]))
 
 #from modules import create_schema
-from modules.main import Operations
+from modules.ui import ui
 
 
 
 if __name__ == '__main__':
-    Operations()
+    obj = ui()
+    obj.main()
