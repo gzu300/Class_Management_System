@@ -168,6 +168,7 @@ class ui(object):
     def add_teacher_view(self):
         enter = input('Enter teacher\'s name:').strip().lower()
         t_exist = self.mngr.check_teacher(enter)
+        breakpoint()
         if t_exist:
             print('{0} already existed.'.format(enter))
         else:

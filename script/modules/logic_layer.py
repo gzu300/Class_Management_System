@@ -3,7 +3,7 @@ from sqlalchemy.sql import exists
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, create_engine, MetaData
 from .create_schema import *
-from conf.setting import engine
+from ..conf.setting import engine
 import pandas as pd
 import os
 
@@ -32,7 +32,16 @@ class AdminMngr(object):
 
     def dispose(self):
         self.__engine.dispose()
-    def rgt_teacher(self):
+
+    def check_teacher(self, name):
+        self.connect()
+        self.__engine.execute('USE class_management;')
+        metadata = MetaData()
+        metadata.reflect(self.__engine)
+        print(metadata)
+        #return result
+
+    def rgt_teacher(self, name):
         pass
     # def initialize(self):
     #     if self.session.query(func.count(Teachers.id)).scalar() == 0:
@@ -127,3 +136,7 @@ class StudentMngr(Operations):
         return
     def query(self):
         return
+
+if __name__ == '__main__':
+    a = AdminMngr(user='root', password='sp880922', host='localhost')
+    a.check_teacher('alex')

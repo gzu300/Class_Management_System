@@ -1,12 +1,13 @@
 #coding=utf-8
 
-from conf.setting import engine
+from ..conf.setting import engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, relationship
 from sqlalchemy import Table, Column, ForeignKey
 from sqlalchemy import Integer, String, Enum
 
 Base = declarative_base()
+engine = engine
 
 class Stu_Courses(Base):
     __tablename__ = 'student_m2m_course'
