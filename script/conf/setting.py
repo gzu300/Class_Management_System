@@ -5,4 +5,4 @@ from sqlalchemy import create_engine
 
 engine = create_engine('mysql+mysqldb://root:sp880922@localhost/class_management')
 
-connection = print('='*10, 'connected to db', '='*10, sep='\n')
+connection = print('connected to db, through setting\n', '-'*10)

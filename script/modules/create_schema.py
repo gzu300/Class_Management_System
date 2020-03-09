@@ -1,19 +1,33 @@
 #coding=utf-8
 
-from conf.setting import engine
+from ..conf.setting import engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, relationship
-from sqlalchemy import Column, ForeignKey
+from sqlalchemy import Table, Column, ForeignKey
 from sqlalchemy import Integer, String, Enum
 
 Base = declarative_base()
+engine = engine
 
 class Stu_Courses(Base):
     __tablename__ = 'student_m2m_course'
-
+    
     id = Column(Integer, primary_key=True)
     students_id = Column(Integer, ForeignKey('student.id'))
     courses_id = Column(Integer, ForeignKey('course.id'))
+
+# class Tea_Courses(Base):
+#     __tablename__ = 'teacher_m2m_course'
+
+#     id = Column(Integer, primary_key=True)
+#     students_id = Column(Integer, ForeignKey('student.id'))
+#     courses_id = Column(Integer, ForeignKey('course.id'))
+
+Tea_Courses = Table(
+    'teacher_m2m_course', Base.metadata,
+    Column('teacher_id', Integer, ForeignKey('teacher.id')),
+    Column('course_id', Integer, ForeignKey('course.id'))
+)
 
 class Attendance(Base):
     '''
@@ -58,7 +72,7 @@ class Lessons(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(10), nullable=False, unique=True)
 
-    attendance = relationship('Stu_Courses', secondary='attendance', backref='lessons')
+    attendance = relationship('Stu_Courses', secondary='attendance', backref='lessons', lazy='joined')
 
 class Courses(Base):
     __tablename__ = 'course'
@@ -67,6 +81,7 @@ class Courses(Base):
     name = Column(String(10), nullable=False, unique=True)
 
     students = relationship('Students', secondary='student_m2m_course', backref='courses')
+    teachers = relationship('Teachers', secondary=Tea_Courses, backref='courses')#lazy='joined' makes the relationship query a joined table with original tables. to be verified.
 
 # class Sessions(Base):
 #     '''
@@ -83,4 +98,8 @@ class Courses(Base):
 #     lessons = relationship('Lessons', back_populates='courses_m2m_lessons')
 
 Base.metadata.create_all(engine)
+
+
+
+
 
