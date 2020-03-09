@@ -72,7 +72,7 @@ class Lessons(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(10), nullable=False, unique=True)
 
-    attendance = relationship('Stu_Courses', secondary='attendance', backref='lessons')
+    attendance = relationship('Stu_Courses', secondary='attendance', backref='lessons', lazy='joined')
 
 class Courses(Base):
     __tablename__ = 'course'
@@ -81,7 +81,7 @@ class Courses(Base):
     name = Column(String(10), nullable=False, unique=True)
 
     students = relationship('Students', secondary='student_m2m_course', backref='courses')
-    teachers = relationship('Teachers', secondary=Tea_Courses, backref='courses', lazy='joined')#lazy='joined' makes the relationship query a joined table with original tables. to be verified.
+    teachers = relationship('Teachers', secondary=Tea_Courses, backref='courses')#lazy='joined' makes the relationship query a joined table with original tables. to be verified.
 
 # class Sessions(Base):
 #     '''
@@ -96,6 +96,8 @@ class Courses(Base):
 
 #     courses = relationship('Courses', back_populates='courses_m2m_lessons')
 #     lessons = relationship('Lessons', back_populates='courses_m2m_lessons')
+
+Base.metadata.create_all(engine)
 
 
 

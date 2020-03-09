@@ -117,31 +117,36 @@ class ui(object):
                 '5, Check course',
                 '6. Check homework.',
                 '7. Give score.',
-                '8, Go back.',
-                '9, Exit',               
+                '8. Check students',
+                'b, Go back.',
+                'q, Exit',               
                 '='*10,
                 sep='\n'
             )
             enter = input('Enter your selection:').strip().lower()
             if enter == '1':
-                pass
-            elif enter == '2':
+                self.add_student_view()
+                continue
+            if enter == '2':
                 self.add_course_view()
                 continue
-            elif enter == '3':
+            if enter == '3':
                 pass
-            elif enter == '4':
+            if enter == '4':
                 pass
-            elif enter == '5':
+            if enter == '5':
                 self.teacher_course_view()
                 continue
-            elif enter == '6':
+            if enter == '6':
                 pass
-            elif enter == '7':
+            if enter == '7':
                 pass
-            elif enter == '8':
+            if enter == '8':
+                self.student_course_view()
+                continue
+            if enter == 'b':
                 break
-            elif enter == '9':
+            if enter == 'q':
                 sys.exit()
     def student_view(self, name):
         print(
@@ -154,31 +159,52 @@ class ui(object):
         )
         enter = input('Make a selection:')
         return enter
+        
     def add_student_view(self):
-        return
+        s_email = input('Enter student\'s email:').strip().lower()
+        s_name = input('Enter student\'s name:').strip().lower()
+        c_name = input('Enter student\'s course:').strip().lower()
+        result = self.mngr.rgt_student(email=s_email, name=s_name, c_name=c_name)
+        if not result:
+            print('Course does not exist. Register course: {0} first.'.format(c_name), '='*10, sep='\n')
+            return
+        print('{0} with email: {1} successfully registered.'.format(s_name, s_email), '='*10, sep='\n')
+
+    # def add_s_course_view(self):
+    #     enter = input('Enter ')
+    #     s_course = self.mngr.rgt_s_course(enter)
+
     def add_course_view(self):
         enter = input('Enter the name of the new course:').strip().lower()
-        # c_exist = self.mngr.check_course(enter)
-        # if c_exist:
-        #     print('Course already existed.')
-        # else:
+
         self.mngr.rgt_course(enter)
         print('{0} has beed successully registered.'.format(enter), '='*10, sep='\n')
 
     def add_teacher_view(self):
         enter = input('Enter teacher\'s name:').strip().lower()
         t_exist = self.mngr.check_teacher(enter)
-        breakpoint()
         if t_exist:
             print('{0} already existed.'.format(enter))
-        else:
-            self.mngr.rgt_teacher(enter)
-            print('{0} has beed successully registered.'.format(enter), '='*10, sep='\n')
+            return
+        self.mngr.rgt_teacher(enter)
+        print('{0} has beed successully registered.'.format(enter), '='*10, sep='\n')
     
     def teacher_course_view(self):
         print('='*10)
         #c_name = input('Enter the course you would like to search:').strip().lower()
         df = self.mngr.q_t_courses()
+        if df.empty:
+            print('No course registerd. Registered a course first.', '='*10, sep='\n')
+            return
+        print(df, '='*10, sep='\n')
+
+    def student_course_view(self):
+        print('='*10)
+        #c_name = input('Enter the course you would like to search:').strip().lower()
+        df = self.mngr.q_t_students()
+        if df.empty:
+            print('No course registerd. Registered a course first.', '='*10, sep='\n')
+            return
         print(df, '='*10, sep='\n')
         
     def add_session_view(self):

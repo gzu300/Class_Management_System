@@ -1,13 +1,15 @@
 #coding=utf-8
 from sqlalchemy.sql import exists
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, create_engine, MetaData
+from sqlalchemy import func, create_engine, MetaData, inspect
 from .create_schema import *
 from ..conf.setting import engine
 import pandas as pd
 import os
 
 class AdminMngr(object):
+    pass
+'''
     def __init__(self, user, password, host):
         self.user = user
         self.password = password
@@ -50,7 +52,7 @@ class AdminMngr(object):
     #         self.session.add(teacher)
     #         self.session.commit()
     #         self.session.close()
-
+'''
 class Operations(object):
     def __init__(self):
         self.session = Session(bind=engine)
@@ -62,6 +64,22 @@ class Operations(object):
     #     #used for teacher's and student's name check
     #     result = self.session.query(obj).filter(obj == name).first()
     #     return result
+
+    def q_t(self, obj, related_c):
+        to_join = getattr(obj, related_c)
+        result = self.session.query(obj).options(joinedload(to_join))
+        if not result.first():
+            return pd.DataFrame()
+        list2 = getattr(result.first(), related_c)[0].__table__.c#get columns of related tables
+        list1 = result.first().__table__.c
+
+        df = pd.read_sql(result.statement, con=engine)
+        df.columns = list1+list2
+        return df
+    
+    def rgt(self):
+        return
+
     def initialize(self):
         if self.session.query(func.count(Teachers.id)).scalar() == 0:
             print('Database is empty. Registering teacher Alex into system')
@@ -89,17 +107,21 @@ class TeacherMngr(Operations):
         existed = Operations.check(self, obj=Courses, c_name='name', name=enter)
         return existed
     
-    def check_student(self, enter):
-        existed = Operations.check(self, obj=Students, c_name='email', name=enter)
-        return existed
+    def check_student(self, email):
+        self.student = Operations.check(self, obj=Students, c_name='email', name=email)
+        return self.student
 
     def q_t_courses(self):
-        result = self.session.query(Courses).statement
+        return Operations.q_t(self, obj=Courses, related_c='teachers')
+        # result = self.session.query(Courses).statement
         # result = self.session.query(Teachers).first()
         # print(result.teachers[0].name)
         # breakpoint()
-        df = pd.read_sql(result, con=engine)
-        return df
+        # df = pd.read_sql(result.statement, con=engine)
+        # return df
+
+    def q_t_students(self):
+        return Operations.q_t(self, obj=Students, related_c='courses')
 
     def rgt_course(self, name):
         '''
@@ -113,8 +135,19 @@ class TeacherMngr(Operations):
         course.teachers.append(teacher)
         self.session.add(course)
         self.session.commit()
-    def rgt_student(self):
-        return
+
+    def rgt_student(self, email, name, c_name):
+        student = self.check_student(email=email)
+        course = self.check_course(enter=c_name)
+        if not course:
+            return 
+        if not student:
+            student = Students(email=email, name=name)
+        course = self.session.query(Courses).filter(Courses.name==c_name).first()
+        course.students.append(student)
+        self.session.add(student)
+        self.session.commit()
+        return True #this is to be consistant with condition in ui.add_student_view
     def rgt_session(self):
         return
     def rec_attendance(self):
