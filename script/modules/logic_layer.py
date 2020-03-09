@@ -34,11 +34,11 @@ class AdminMngr(object):
         self.__engine.dispose()
 
     def check_teacher(self, name):
-        self.connect()
-        self.__engine.execute('USE class_management;')
-        metadata = MetaData()
-        metadata.reflect(self.__engine)
-        print(metadata)
+        Base.metadata.reflect(bind=engine)
+        print(Base.metadata.tables)
+        # metadata = MetaData()
+        # metadata.reflect(self.__engine)
+        # print(metadata)
         #return result
 
     def rgt_teacher(self, name):
@@ -55,10 +55,8 @@ class Operations(object):
     def __init__(self):
         self.session = Session(bind=engine)
 
-    def check(self, obj, name):
-        ext = exists().where(obj == name)
-
-        result = self.session.query(obj).filter(ext).all()
+    def check(self, obj, c_name, name):
+        result = self.session.query(obj).filter(getattr(obj, c_name)==name).first()
         return result
     # def check(self, obj, name):
     #     #used for teacher's and student's name check
@@ -82,22 +80,21 @@ class TeacherMngr(Operations):
     - Record attendance of studnts
     - Give scores for students's hw for every session
     '''
-    def authenticate(self, name):
-        self.t_name = name
-        auth = Operations.check(self, obj=Teachers.name, name=name)
+    def authenticate(self, enter):
+        self.t_name = enter
+        auth = Operations.check(self, obj=Teachers, c_name='name', name=enter)
         return auth
 
-    def check_course(self, name):
-        existed = Operations.check(self, obj=Courses.name, name=name)
+    def check_course(self, enter):
+        existed = Operations.check(self, obj=Courses, c_name='name', name=enter)
         return existed
     
-    def check_student(self, email):
-        existed = Operations.check(self, obj=Students.email, name=email)
+    def check_student(self, enter):
+        existed = Operations.check(self, obj=Students, c_name='email', name=enter)
         return existed
 
-    def q_t_courses(self, c_name):
-        result = self.session.query(Courses).\
-            filter_by(name = c_name).statement
+    def q_t_courses(self):
+        result = self.session.query(Courses).statement
         # result = self.session.query(Teachers).first()
         # print(result.teachers[0].name)
         # breakpoint()
@@ -109,7 +106,9 @@ class TeacherMngr(Operations):
         This method return the name of the course
         if course existed. return None
         '''
-        course = Courses(name=name)
+        course = self.check_course(enter=name)
+        if not course:
+            course = Courses(name=name) #when the course not exist. init a new Course instance  
         teacher = self.session.query(Teachers).filter(Teachers.name==self.t_name).first()
         course.teachers.append(teacher)
         self.session.add(course)

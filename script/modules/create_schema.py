@@ -11,7 +11,7 @@ engine = engine
 
 class Stu_Courses(Base):
     __tablename__ = 'student_m2m_course'
-
+    
     id = Column(Integer, primary_key=True)
     students_id = Column(Integer, ForeignKey('student.id'))
     courses_id = Column(Integer, ForeignKey('course.id'))

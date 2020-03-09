@@ -18,7 +18,7 @@ class ui(object):
                 'Please select your category:', 
                 '1. Teacher', 
                 '2. Student',
-                '3. Admin',
+                #'3. Admin',
                 '4. Exit', 
                 '='*10,
                 sep='\n'
@@ -28,8 +28,8 @@ class ui(object):
                 self.t_login()
             elif cat == '2':
                 self.s_login()
-            elif cat == '3':
-                self.a_login()
+            # elif cat == '3':
+            #     self.a_login()
             elif cat == '4':
                 sys.exit()
             else:
@@ -158,12 +158,12 @@ class ui(object):
         return
     def add_course_view(self):
         enter = input('Enter the name of the new course:').strip().lower()
-        c_exist = self.mngr.check_course(enter)
-        if c_exist:
-            print('Course already existed.')
-        else:
-            self.mngr.rgt_course(enter)
-            print('{0} has beed successully registered.'.format(enter), '='*10, sep='\n')
+        # c_exist = self.mngr.check_course(enter)
+        # if c_exist:
+        #     print('Course already existed.')
+        # else:
+        self.mngr.rgt_course(enter)
+        print('{0} has beed successully registered.'.format(enter), '='*10, sep='\n')
 
     def add_teacher_view(self):
         enter = input('Enter teacher\'s name:').strip().lower()
@@ -177,8 +177,8 @@ class ui(object):
     
     def teacher_course_view(self):
         print('='*10)
-        c_name = input('Enter the course you would like to search:').strip().lower()
-        df = self.mngr.q_t_courses(c_name)
+        #c_name = input('Enter the course you would like to search:').strip().lower()
+        df = self.mngr.q_t_courses()
         print(df, '='*10, sep='\n')
         
     def add_session_view(self):
