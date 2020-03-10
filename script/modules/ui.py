@@ -3,6 +3,26 @@ import sys
 import pandas as pd
 from .logic_layer import TeacherMngr, StudentMngr, Operations, AdminMngr
 
+def doubleline_decorator(func):
+    def wrapper(*args, **kwargs):
+        print('='*10)
+        a = func(*args, **kwargs)
+        print('='*10)
+        return a
+    return wrapper
+
+def whileTrue_decorator(func):
+    '''
+    wraps a function into while loop.
+    '''
+    def wrapper(*args):
+        while True:
+            if any([each == 'b' for each in args]):
+                break
+            return func(*args)
+            
+    return wrapper
+
 class ui(object):
 
     def __init__(self):
@@ -45,10 +65,6 @@ class ui(object):
                 host = input('Your host:').strip()
                 self.mngr = Mngrobj(user=user, password=pwd, host=host)
                 user_view()
-                # if self.mngr.authenticate(user=user, password=pwd, host=host):
-                #     user_view(name)
-                # else:
-                #     print('{0} is not in the record.'.format(name), '='*10, sep='\n')
 
     def a_login(self):
         self._login(Mngrobj=AdminMngr, user_view=self.admin_view)
@@ -112,7 +128,7 @@ class ui(object):
                 'Welcome {0}. You have the following possible actions'.format(name),
                 '1. Register a student.',
                 '2. Register a course.',
-                '3. Register a session.',
+                '3. Register a lesson.',
                 '4, Register a attendance.',
                 '5, Check course',
                 '6. Check homework.',
@@ -131,7 +147,11 @@ class ui(object):
                 self.add_course_view()
                 continue
             if enter == '3':
-                pass
+                course = input('Enter the name of the course:').strip().lower()
+                lesson = input('Enter the name of the lesson:').strip().lower()
+
+                self.add_lesson_view(lesson, course)
+                continue
             if enter == '4':
                 pass
             if enter == '5':
@@ -148,9 +168,10 @@ class ui(object):
                 break
             if enter == 'q':
                 sys.exit()
+    
+    @doubleline_decorator
     def student_view(self, name):
         print(
-            '='*10,
             'Welcome {0}. You have the following possible actions:'.format(name),
             '1. Submit a homework.',
             '2. Check your ranking.',
@@ -170,10 +191,6 @@ class ui(object):
             return
         print('{0} with email: {1} successfully registered.'.format(s_name, s_email), '='*10, sep='\n')
 
-    # def add_s_course_view(self):
-    #     enter = input('Enter ')
-    #     s_course = self.mngr.rgt_s_course(enter)
-
     def add_course_view(self):
         enter = input('Enter the name of the new course:').strip().lower()
 
@@ -189,34 +206,39 @@ class ui(object):
         self.mngr.rgt_teacher(enter)
         print('{0} has beed successully registered.'.format(enter), '='*10, sep='\n')
     
+    @doubleline_decorator
     def teacher_course_view(self):
-        print('='*10)
-        #c_name = input('Enter the course you would like to search:').strip().lower()
         df = self.mngr.q_t_courses()
         if df.empty:
             print('No course registerd. Registered a course first.', '='*10, sep='\n')
             return
-        print(df, '='*10, sep='\n')
+        print(df, sep='\n')
 
+    @doubleline_decorator
     def student_course_view(self):
-        print('='*10)
-        #c_name = input('Enter the course you would like to search:').strip().lower()
         df = self.mngr.q_t_students()
         if df.empty:
             print('No course registerd. Registered a course first.', '='*10, sep='\n')
             return
-        print(df, '='*10, sep='\n')
-        
-    def add_session_view(self):
-        return
+        print(df, sep='\n')
+
+    @whileTrue_decorator    
+    def add_lesson_view(self, lesson, course): 
+        if not self.mngr.rgt_lesson(lesson, course):
+            print('Can\' find course ({0}). Register the course first.'.format(course))
+            return
+        print('Lesson({0}) successfully added to course({1}).'.format(lesson, course))
     def add_attend(self):
         return
+
+    @doubleline_decorator
     def check_homework(self):
         return
     def score(self):
         return
     def submit_hw(self):
         return
+    @doubleline_decorator
     def check_rank(self):
         return
 

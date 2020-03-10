@@ -58,8 +58,13 @@ class Operations(object):
         self.session = Session(bind=engine)
 
     def check(self, obj, c_name, name):
-        result = self.session.query(obj).filter(getattr(obj, c_name)==name).first()
-        return result
+        '''
+        return the first object found. Otherwise, return empty list.
+        '''
+        if hasattr(obj, c_name):
+            result = self.session.query(obj).filter(getattr(obj, c_name)==name).first()
+            return result
+        return []
     # def check(self, obj, name):
     #     #used for teacher's and student's name check
     #     result = self.session.query(obj).filter(obj == name).first()
@@ -77,8 +82,23 @@ class Operations(object):
         df.columns = list1+list2
         return df
     
-    def rgt(self):
-        return
+    def rgt(self, rgtObj, checkObj, rgt_c_name, check_c_name, rgt_name, check_name, related_c, **kwargs):
+        '''
+        This method return the name of the course
+        if course existed. return None
+        '''
+        rgt = self.check(rgtObj, rgt_c_name, rgt_name)
+        check = self.check(checkObj, check_c_name, check_name)
+
+        if not check:
+            return
+        if not rgt:
+            rgt = rgtObj(**kwargs)
+        getattr(rgt, related_c).append(check)#column name in relations is designed to be the same as Obj
+        self.session.add(rgt)
+        self.session.commit()
+        return True
+
 
     def initialize(self):
         if self.session.query(func.count(Teachers.id)).scalar() == 0:
@@ -110,6 +130,10 @@ class TeacherMngr(Operations):
     def check_student(self, email):
         self.student = Operations.check(self, obj=Students, c_name='email', name=email)
         return self.student
+
+    def check_lesson(self, lesson):
+        existed = Operations.check(self, obj=Lessons, c_name='name', name=lesson)
+        return existed
 
     def q_t_courses(self):
         return Operations.q_t(self, obj=Courses, related_c='teachers')
@@ -148,9 +172,22 @@ class TeacherMngr(Operations):
         self.session.add(student)
         self.session.commit()
         return True #this is to be consistant with condition in ui.add_student_view
-    def rgt_session(self):
-        return
-    def rec_attendance(self):
+
+    def rgt_lesson(self, lesson, course):
+        courses = self.check_course(enter=course)
+        lessons = self.check_lesson(lesson=lesson)
+        if not courses:
+            return 
+        if not lessons:
+            lessons = Lessons(name=lesson)
+        courses.lessons.append(lessons)
+        self.session.add(lessons)
+        self.session.commit()
+        return True
+
+        # return self.rgt(Lessons, Courses, 'name', 'name', lesson, course, 'courses', name='courses')
+
+    def rgt_attendance(self):
         return
     def score(self):
         return
@@ -168,7 +205,3 @@ class StudentMngr(Operations):
         return
     def query(self):
         return
-
-if __name__ == '__main__':
-    a = AdminMngr(user='root', password='sp880922', host='localhost')
-    a.check_teacher('alex')
