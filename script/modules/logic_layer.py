@@ -1,7 +1,7 @@
 #coding=utf-8
 from sqlalchemy.sql import exists
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, create_engine, MetaData, inspect
+from sqlalchemy.orm import Session, joinedload, subqueryload
+from sqlalchemy import func, create_engine, MetaData, inspect, and_
 from .create_schema import *
 from ..conf.setting import engine
 import pandas as pd
@@ -187,8 +187,26 @@ class TeacherMngr(Operations):
 
         # return self.rgt(Lessons, Courses, 'name', 'name', lesson, course, 'courses', name='courses')
 
-    def rgt_attendance(self):
-        return
+    def rgt_attendance(self, lesson, course, student_email):
+        lessons = self.check_lesson(lesson=lesson)
+        courses = self.check_course(enter=course)
+        students = self.check_student(email=student_email)
+
+        if not all([lessons, courses, students]):
+            return
+        '''
+        stmt = self.session.query(Lessons.id, Courses.id).filter(and_(Lessons.name==lesson, Courses.name==course)).first()
+        result = self.session.query(Sessions).filter(Sessions.lessons_id==stmt[0], Sessions.courses_id==stmt[1]).first()
+        print(result.__dict__)
+        breakpoint()
+        print(students.__dict__)
+        breakpoint()
+        print(result.students)
+        breakpoint()
+        '''
+        # for chained joinedloads, the first item must return the object that can be used for the second joinedload
+        result = self.session.query(Sessions).options(joinedload(Sessions.students))
+        print(pd.read_sql(result.statement, con=engine))
     def score(self):
         return
     def query_student(self):
@@ -205,3 +223,8 @@ class StudentMngr(Operations):
         return
     def query(self):
         return
+
+if __name__ == '__main__':
+    a = TeacherMngr()
+    a.rgt_attendance('day1', 'linux', 'zhu@email.com')
+

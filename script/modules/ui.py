@@ -153,7 +153,8 @@ class ui(object):
                 self.add_lesson_view(lesson, course)
                 continue
             if enter == '4':
-                pass
+                self.add_attendance_view()
+                continue
             if enter == '5':
                 self.teacher_course_view()
                 continue
@@ -228,8 +229,8 @@ class ui(object):
             print('Can\' find course ({0}). Register the course first.'.format(course))
             return
         print('Lesson({0}) successfully added to course({1}).'.format(lesson, course))
-    def add_attend(self):
-        return
+    def add_attendance_view(self):
+        self.mngr.rgt_attendance('day1', 'linux', 'zhu@email.com')
 
     @doubleline_decorator
     def check_homework(self):
