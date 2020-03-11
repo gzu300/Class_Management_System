@@ -4,7 +4,7 @@ from ..conf.setting import engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, relationship
 from sqlalchemy import Table, Column, ForeignKey
-from sqlalchemy import Integer, String, Enum
+from sqlalchemy import Integer, String, Enum, Boolean
 
 Base = declarative_base()
 engine = engine
@@ -88,6 +88,7 @@ class Attendance(Base):
     id = Column(Integer, primary_key=True)
     homework = Column(String(100))
     score =  Column(Integer)
+    attend = Column(Boolean)
     stu_id = Column(Integer, ForeignKey('student.id'))
     session_id = Column(Integer, ForeignKey('session.id'))
 

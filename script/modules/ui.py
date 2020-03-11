@@ -17,7 +17,7 @@ def whileTrue_decorator(func):
     '''
     def wrapper(*args):
         while True:
-            if any([each == 'b' for each in args]):
+            if ('b' in args):
                 break
             return func(*args)
             
@@ -55,31 +55,33 @@ class ui(object):
             else:
                 print('Please select a valid category.')
 
-    def _login(self, Mngrobj, user_view):
+    def _login(self, Mngrobj):
         while True:
-            user = input('You can enter \'q\' to go back to previous section. \nOtherwise, enter your username:').strip()
-            if user == 'q':
-                break
-            else:
-                pwd = input('Password:').strip()
-                host = input('Your host:').strip()
-                self.mngr = Mngrobj(user=user, password=pwd, host=host)
-                user_view()
-
-    def a_login(self):
-        self._login(Mngrobj=AdminMngr, user_view=self.admin_view)
-
-    def t_login(self):
-        while True:
-            name = input('You can enter \'q\' to go back to previous section. \nOtherwise, enter your name:').strip()
+            name = input('You can enter \'q\' to go back to previous section. \nOtherwise, enter your username:').strip()
             if name == 'q':
                 break
-            else:
-                self.mngr = TeacherMngr()
-                if self.mngr.authenticate(name):
-                    self.teacher_view(name)
-                else:
-                    print('{0} is not in the record.'.format(name), '='*10, sep='\n')
+            self.mngr = Mngrobj()
+            if not self.mngr.authenticate(name):
+                print('{0} is not in the record.'.format(name), '='*10, sep='\n')
+                continue
+            getattr(self, self.mngr.view)(name) # Run TeacherMngr or StudentMngr
+
+    def a_login(self):
+        #self._login(Mngrobj=AdminMngr, user_view=self.admin_view)
+        return
+
+    def t_login(self):
+        # while True:
+        #     name = input('You can enter \'q\' to go back to previous section. \nOtherwise, enter your name:').strip()
+        #     if name == 'q':
+        #         break
+        #     else:
+        #         self.mngr = TeacherMngr()
+        #         if self.mngr.authenticate(name):
+        #             self.teacher_view(name)
+        #         else:
+        #             print('{0} is not in the record.'.format(name), '='*10, sep='\n')
+        self._login(Mngrobj=TeacherMngr)
 
     def s_login(self):
         enter = input('You can enter \'q\' to go back to previous section. \nOtherwise, enter your email address:')
@@ -153,7 +155,17 @@ class ui(object):
                 self.add_lesson_view(lesson, course)
                 continue
             if enter == '4':
-                self.add_attendance_view()
+                s_email = input('Enter student\'s email:').strip().lower()
+                # s_name = input('Enter student\'s name:').strip().lower()
+                l_name = input('Enter student\'s lesson:').strip().lower()
+                c_name = input('Enter student\'s course:').strip().lower()
+                if_attended = input('Is the student present? type in \'yes\' or \'no\'.').strip().lower()
+                if if_attended == 'yes':
+                    self.add_attendance_view(l_name, c_name, s_email, True)
+                elif if_attended == 'no':
+                    self.add_attendance_view(l_name, c_name, s_email, False)
+                else:
+                    print('No a valid entry for attendance')
                 continue
             if enter == '5':
                 self.teacher_course_view()
@@ -226,11 +238,16 @@ class ui(object):
     @whileTrue_decorator    
     def add_lesson_view(self, lesson, course): 
         if not self.mngr.rgt_lesson(lesson, course):
-            print('Can\' find course ({0}). Register the course first.'.format(course))
+            print('Error: Can\' find course ({0}). Register the course first.'.format(course))
             return
         print('Lesson({0}) successfully added to course({1}).'.format(lesson, course))
-    def add_attendance_view(self):
-        self.mngr.rgt_attendance('day1', 'linux', 'zhu@email.com')
+    @whileTrue_decorator
+    def add_attendance_view(self, lesson, course, student_email, if_attended):
+        result = self.mngr.rgt_attendance(lesson, course, student_email, if_attended)
+        if not result:              
+            print('Error: Student, Lesson , Session or/and Course do not exist. Register before entering attendance.')
+            return
+        print('Attendance successfully entered.')
 
     @doubleline_decorator
     def check_homework(self):

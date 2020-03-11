@@ -64,11 +64,7 @@ class Operations(object):
         if hasattr(obj, c_name):
             result = self.session.query(obj).filter(getattr(obj, c_name)==name).first()
             return result
-        return []
-    # def check(self, obj, name):
-    #     #used for teacher's and student's name check
-    #     result = self.session.query(obj).filter(obj == name).first()
-    #     return result
+        
 
     def q_t(self, obj, related_c):
         to_join = getattr(obj, related_c)
@@ -118,8 +114,15 @@ class TeacherMngr(Operations):
     - Record attendance of studnts
     - Give scores for students's hw for every session
     '''
+    def __init__(self):
+        Operations.__init__(self)
+        self.view = 'teacher_view'
+
     def authenticate(self, enter):
         self.t_name = enter
+        return self.check_teacher(enter)
+
+    def check_teacher(self, enter):
         auth = Operations.check(self, obj=Teachers, c_name='name', name=enter)
         return auth
 
@@ -137,12 +140,6 @@ class TeacherMngr(Operations):
 
     def q_t_courses(self):
         return Operations.q_t(self, obj=Courses, related_c='teachers')
-        # result = self.session.query(Courses).statement
-        # result = self.session.query(Teachers).first()
-        # print(result.teachers[0].name)
-        # breakpoint()
-        # df = pd.read_sql(result.statement, con=engine)
-        # return df
 
     def q_t_students(self):
         return Operations.q_t(self, obj=Students, related_c='courses')
@@ -153,13 +150,17 @@ class TeacherMngr(Operations):
         if course existed. return None
         '''
         course = self.check_course(enter=name)
+        teacher = self.check_teacher(enter=self.t_name)
+        student = self.session.query(Students).join(Students.courses).\
+            filter(Courses.name==name).all()# query if there is relationship appended to this course
         if not course:
-            course = Courses(name=name) #when the course not exist. init a new Course instance  
-        teacher = self.session.query(Teachers).filter(Teachers.name==self.t_name).first()
+            course = Courses(name=name) #when the course not exist. init a new Course instance
+        if not student:
+            course.students.append()
         course.teachers.append(teacher)
         self.session.add(course)
         self.session.commit()
-
+        return True                     #this is to be consistant with condition in ui.add_student_view
     def rgt_student(self, email, name, c_name):
         student = self.check_student(email=email)
         course = self.check_course(enter=c_name)
@@ -167,11 +168,10 @@ class TeacherMngr(Operations):
             return 
         if not student:
             student = Students(email=email, name=name)
-        course = self.session.query(Courses).filter(Courses.name==c_name).first()
         course.students.append(student)
         self.session.add(student)
         self.session.commit()
-        return True #this is to be consistant with condition in ui.add_student_view
+        return True 
 
     def rgt_lesson(self, lesson, course):
         courses = self.check_course(enter=course)
@@ -187,25 +187,70 @@ class TeacherMngr(Operations):
 
         # return self.rgt(Lessons, Courses, 'name', 'name', lesson, course, 'courses', name='courses')
 
-    def rgt_attendance(self, lesson, course, student_email):
+    def rgt_attendance(self, lesson, course, student_email, if_attended):
+        '''
+        This method is a little bit complicated then the others. Here are the steps:
+        First. it has to check all the Table objects exist upon arguments.
+        Second. Then therer is possibility that relationships are missing even though objects exist.
+                So it adds the relationships for course-student and lesson-course. This is essentional
+                for the next step.
+        Third. Locate the entry(row) of object from Session table.
+        Forth. Add relationships for session-student. 
+               For example: We have the following relstionships. a-b. b-c. 
+               Since ORM could not tell there is relationship between a-c. So have to add explicitly
+        Fifth. Locate the value of attend in attendance table and make assignment. 
+        Finally. commit
+        '''
+
+        #check existance of prerequisites
         lessons = self.check_lesson(lesson=lesson)
         courses = self.check_course(enter=course)
         students = self.check_student(email=student_email)
-
         if not all([lessons, courses, students]):
             return
-        '''
-        stmt = self.session.query(Lessons.id, Courses.id).filter(and_(Lessons.name==lesson, Courses.name==course)).first()
-        result = self.session.query(Sessions).filter(Sessions.lessons_id==stmt[0], Sessions.courses_id==stmt[1]).first()
-        print(result.__dict__)
-        breakpoint()
-        print(students.__dict__)
-        breakpoint()
-        print(result.students)
-        breakpoint()
+
+        #append relationship if not added.
+        courses.students.append(students)
+        lessons.courses.append(courses)
+
+        #check and locate the Session table object
+        session = self.session.query(Sessions).\
+            filter(and_(
+                Sessions.courses_id==courses.id,
+                Sessions.lessons_id==lessons.id
+            )).first() #Sessions table is a relationship table.
+               #So query this table needs ids. Maybe in the future
+               #a unique name could be added as index. But now
+               #let's leave it like this first.
+        if not session: # this shouldn't happen as previous step already added this entry of Session table.
+            return
+        
         '''
         # for chained joinedloads, the first item must return the object that can be used for the second joinedload
-        result = self.session.query(Sessions).options(joinedload(Sessions.students))
+        # result = self.session.query(Sessions).options(joinedload(Sessions.students))
+        # print(pd.read_sql(session.statement, con=engine))
+        '''
+        #append session and student table relationship which is attendance table
+        students.sessions.append(session)
+
+        # assign attendance
+        attendance = self.session.query(Attendance).\
+            filter(
+                and_(
+                    Attendance.stu_id==students.id,
+                    Attendance.session_id==session.id
+                )
+            ).first()
+        attendance.attend = if_attended
+        #commit
+        self.session.commit()
+        return True
+
+    def q_t_attendance(self):
+        result = self.session.query(Lessons, Attendance.homework, Attendance.score).\
+            options(joinedload(Lessons.courses).
+                    joinedload(Courses.students))
+
         print(pd.read_sql(result.statement, con=engine))
     def score(self):
         return
@@ -213,12 +258,21 @@ class TeacherMngr(Operations):
         return
     def query_course(self):
         return
+    def test(self, name):
+        student = self.session.query(Students).join(Students.courses).\
+            filter(Courses.name==name).all()
+        print(self.session.query(Students).join(Students.courses).first().__dict__)
+        print(name)
+        print(student)
 
 class StudentMngr(Operations):
     '''
     -Submit hw
     -See the ranking for a course.
     '''
+    def __init__(self):
+        Operations.__init__(self)
+        self.view = 'student_view'
     def submit(self):
         return
     def query(self):
@@ -226,5 +280,5 @@ class StudentMngr(Operations):
 
 if __name__ == '__main__':
     a = TeacherMngr()
-    a.rgt_attendance('day1', 'linux', 'zhu@email.com')
+    a.test('python')
 
