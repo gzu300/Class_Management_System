@@ -13,4 +13,4 @@ This command line system manages teachers, students and classes.\
 ### Student
 1. Submit homework.
 2. View grades for each lesson.
-3. View ranking of grades for each class.(*This is common in China*)
+3. View ranking of grades for each class.

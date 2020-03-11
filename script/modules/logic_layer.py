@@ -64,11 +64,7 @@ class Operations(object):
         if hasattr(obj, c_name):
             result = self.session.query(obj).filter(getattr(obj, c_name)==name).first()
             return result
-        return []
-    # def check(self, obj, name):
-    #     #used for teacher's and student's name check
-    #     result = self.session.query(obj).filter(obj == name).first()
-    #     return result
+        
 
     def q_t(self, obj, related_c):
         to_join = getattr(obj, related_c)
@@ -118,6 +114,9 @@ class TeacherMngr(Operations):
     - Record attendance of studnts
     - Give scores for students's hw for every session
     '''
+    def __init__(self):
+        Operations.__init__(self)
+        self.view = 'teacher_view'
     def authenticate(self, enter):
         self.t_name = enter
         auth = Operations.check(self, obj=Teachers, c_name='name', name=enter)
@@ -155,7 +154,6 @@ class TeacherMngr(Operations):
         course = self.check_course(enter=name)
         if not course:
             course = Courses(name=name) #when the course not exist. init a new Course instance  
-        teacher = self.session.query(Teachers).filter(Teachers.name==self.t_name).first()
         course.teachers.append(teacher)
         self.session.add(course)
         self.session.commit()
@@ -167,7 +165,6 @@ class TeacherMngr(Operations):
             return 
         if not student:
             student = Students(email=email, name=name)
-        course = self.session.query(Courses).filter(Courses.name==c_name).first()
         course.students.append(student)
         self.session.add(student)
         self.session.commit()
@@ -187,25 +184,43 @@ class TeacherMngr(Operations):
 
         # return self.rgt(Lessons, Courses, 'name', 'name', lesson, course, 'courses', name='courses')
 
-    def rgt_attendance(self, lesson, course, student_email):
+    def rgt_attendance(self, lesson, course, student_email, if_attended=None):
         lessons = self.check_lesson(lesson=lesson)
         courses = self.check_course(enter=course)
         students = self.check_student(email=student_email)
+        sessions = self.session.query(Sessions).\
+            filter(and_(
+                Sessions.courses_id==courses.id,
+                Sessions.lessons_id==lessons.id
+            ))
 
-        if not all([lessons, courses, students]):
+        if not all([lessons, courses, students, sessions]):
             return
-        '''
-        stmt = self.session.query(Lessons.id, Courses.id).filter(and_(Lessons.name==lesson, Courses.name==course)).first()
-        result = self.session.query(Sessions).filter(Sessions.lessons_id==stmt[0], Sessions.courses_id==stmt[1]).first()
-        print(result.__dict__)
-        breakpoint()
-        print(students.__dict__)
-        breakpoint()
-        print(result.students)
-        breakpoint()
-        '''
         # for chained joinedloads, the first item must return the object that can be used for the second joinedload
-        result = self.session.query(Sessions).options(joinedload(Sessions.students))
+        # result = self.session.query(Sessions).options(joinedload(Sessions.students))
+        
+
+        #locate the row in session table.
+
+        
+        # print(pd.read_sql(session.statement, con=engine))
+        # append student to the row.
+        sessions.first().students.append(students)
+        self.session.commit()
+        attendance = self.session.query(Session).\
+            filter(
+                and_(
+                    Attendance.stu_id==students.id,
+                    Attendance.session_id==session.first().id
+                )
+            )
+        attendance.attend = if_attended
+        return True
+    def q_t_attendance(self):
+        result = self.session.query(Lessons, Attendance.homework, Attendance.score).\
+            options(joinedload(Lessons.courses).
+                    joinedload(Courses.students))
+
         print(pd.read_sql(result.statement, con=engine))
     def score(self):
         return
@@ -226,5 +241,6 @@ class StudentMngr(Operations):
 
 if __name__ == '__main__':
     a = TeacherMngr()
-    a.rgt_attendance('day1', 'linux', 'zhu@email.com')
+    a.rgt_attendance('day1', 'python', 'zhu@email.com', if_attended=True)
+    a.q_t_attendance()
 
