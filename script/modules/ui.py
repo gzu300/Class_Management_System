@@ -17,7 +17,7 @@ def whileTrue_decorator(func):
     '''
     def wrapper(*args):
         while True:
-            if any('b' in args):
+            if ('b' in args):
                 break
             return func(*args)
             
@@ -155,7 +155,17 @@ class ui(object):
                 self.add_lesson_view(lesson, course)
                 continue
             if enter == '4':
-                self.add_attendance_view()
+                s_email = input('Enter student\'s email:').strip().lower()
+                # s_name = input('Enter student\'s name:').strip().lower()
+                l_name = input('Enter student\'s lesson:').strip().lower()
+                c_name = input('Enter student\'s course:').strip().lower()
+                if_attended = input('Is the student present? type in \'yes\' or \'no\'.').strip().lower()
+                if if_attended == 'yes':
+                    self.add_attendance_view(l_name, c_name, s_email, True)
+                elif if_attended == 'no':
+                    self.add_attendance_view(l_name, c_name, s_email, False)
+                else:
+                    print('No a valid entry for attendance')
                 continue
             if enter == '5':
                 self.teacher_course_view()
@@ -231,10 +241,11 @@ class ui(object):
             print('Error: Can\' find course ({0}). Register the course first.'.format(course))
             return
         print('Lesson({0}) successfully added to course({1}).'.format(lesson, course))
-
-    def add_attendance_view(self):
-        if not self.mngr.rgt_attendance():
-            print('Error: Student, Lesson or/and Course do not exist. Register before entering attendance.')
+    @whileTrue_decorator
+    def add_attendance_view(self, lesson, course, student_email, if_attended):
+        result = self.mngr.rgt_attendance(lesson, course, student_email, if_attended)
+        if not result:              
+            print('Error: Student, Lesson , Session or/and Course do not exist. Register before entering attendance.')
             return
         print('Attendance successfully entered.')
 
