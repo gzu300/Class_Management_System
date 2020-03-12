@@ -56,6 +56,7 @@ class AdminMngr(object):
 class Operations(object):
     def __init__(self):
         self.session = Session(bind=engine)
+        self.initialize()
 
     def check(self, obj, c_name, name):
         '''
@@ -67,15 +68,18 @@ class Operations(object):
         
 
     def q_t(self, obj, related_c):
+        '''
+        Query and print obj and obj's related table.
+        '''
+        df = pd.DataFrame()
         to_join = getattr(obj, related_c)
-        result = self.session.query(obj).options(joinedload(to_join))
-        if not result.first():
-            return pd.DataFrame()
-        list2 = getattr(result.first(), related_c)[0].__table__.c#get columns of related tables
-        list1 = result.first().__table__.c
+        result = self.session.query(obj).options(joinedload(to_join))#equal to join two tables in sql.
+        if result.first():
+            list2 = getattr(result.first(), related_c)[0].__table__.c#get columns of related tables
+            list1 = result.first().__table__.c
 
-        df = pd.read_sql(result.statement, con=engine)
-        df.columns = list1+list2
+            df = pd.read_sql(result.statement, con=engine)
+            df.columns = ['_'.join(str(each).split('.')) for each in list1+list2]#'.' affects the indexing later
         return df
     
     def rgt(self, rgtObj, checkObj, rgt_c_name, check_c_name, rgt_name, check_name, related_c, **kwargs):
@@ -97,7 +101,7 @@ class Operations(object):
 
 
     def initialize(self):
-        if self.session.query(func.count(Teachers.id)).scalar() == 0:
+        if self.session.query(Teachers).count() == 0:
             print('Database is empty. Registering teacher Alex into system')
             teacher = Teachers(name='Alex')
             self.session.add(teacher)
@@ -138,11 +142,46 @@ class TeacherMngr(Operations):
         existed = Operations.check(self, obj=Lessons, c_name='name', name=lesson)
         return existed
 
+    def q_t_lessons(self, enter):
+        result = Operations.q_t(self, obj=Lessons, related_c='courses')
+        if not result.empty: #In combination with courses,
+                             #lessons give too many rows.
+                             #To select rows of indicated lesson names.
+                             #empty df has now col names.
+                             #to to exclude them.
+            result = result.loc[result.course_name==enter, :]
+        return result
+
     def q_t_courses(self):
         return Operations.q_t(self, obj=Courses, related_c='teachers')
 
     def q_t_students(self):
         return Operations.q_t(self, obj=Students, related_c='courses')
+
+    def q_t_attendance(self, lesson, course):
+        '''
+        This method is different from other q_t methods. More arguments are needed.
+        '''
+        lessons = self.check_lesson(lesson=lesson)
+        courses = self.check_course(enter=course)
+
+        df = pd.DataFrame()
+        if all([lessons, courses]):
+            stmt = self.session.query(Sessions).\
+                filter(and_(
+                    Sessions.courses_id==courses.id,
+                    Sessions.lessons_id==lessons.id
+                )).subquery()
+
+            result = self.session.query(Attendance.homework, Attendance.score, Attendance.attend, Students.name, Students.email, Lessons.name, Courses.name).\
+                    filter(and_(
+                        Attendance.session_id==stmt.c.id,
+                        Attendance.stu_id==Students.id,
+                        Courses.id==stmt.c.courses_id,
+                        Lessons.id==stmt.c.lessons_id
+                    ))
+            df = pd.read_sql(result.statement, con=engine)   
+        return df
 
     def rgt_course(self, name):
         '''
@@ -151,23 +190,20 @@ class TeacherMngr(Operations):
         '''
         course = self.check_course(enter=name)
         teacher = self.check_teacher(enter=self.t_name)
-        student = self.session.query(Students).join(Students.courses).\
-            filter(Courses.name==name).all()# query if there is relationship appended to this course
         if not course:
-            course = Courses(name=name) #when the course not exist. init a new Course instance
-        if not student:
-            course.students.append()
+            return
+        course = Courses(name=name) #when the course not exist. init a new Course instance
         course.teachers.append(teacher)
         self.session.add(course)
         self.session.commit()
         return True                     #this is to be consistant with condition in ui.add_student_view
+
     def rgt_student(self, email, name, c_name):
         student = self.check_student(email=email)
         course = self.check_course(enter=c_name)
-        if not course:
-            return 
-        if not student:
-            student = Students(email=email, name=name)
+        if (not course) or student:
+            return
+        student = Students(email=email, name=name)
         course.students.append(student)
         self.session.add(student)
         self.session.commit()
@@ -176,10 +212,9 @@ class TeacherMngr(Operations):
     def rgt_lesson(self, lesson, course):
         courses = self.check_course(enter=course)
         lessons = self.check_lesson(lesson=lesson)
-        if not courses:
-            return 
-        if not lessons:
-            lessons = Lessons(name=lesson)
+        if (not courses) or lessons:
+            return
+        lessons = Lessons(name=lesson)
         courses.lessons.append(lessons)
         self.session.add(lessons)
         self.session.commit()
@@ -187,7 +222,7 @@ class TeacherMngr(Operations):
 
         # return self.rgt(Lessons, Courses, 'name', 'name', lesson, course, 'courses', name='courses')
 
-    def rgt_attendance(self, lesson, course, student_email, if_attended):
+    def rgt_attendance(self, lesson, course, student_email, if_attended=None):
         '''
         This method is a little bit complicated then the others. Here are the steps:
         First. it has to check all the Table objects exist upon arguments.
@@ -230,34 +265,39 @@ class TeacherMngr(Operations):
         # result = self.session.query(Sessions).options(joinedload(Sessions.students))
         # print(pd.read_sql(session.statement, con=engine))
         '''
-        #append session and student table relationship which is attendance table
-        students.sessions.append(session)
-
-        # assign attendance
-        attendance = self.session.query(Attendance).\
+        
+        check = self.session.query(Attendance).\
             filter(
                 and_(
                     Attendance.stu_id==students.id,
                     Attendance.session_id==session.id
                 )
             ).first()
-        attendance.attend = if_attended
+
+        if check:
+            return
+
+        #assign attendance
+        attendance = Attendance(attend=if_attended)
+        attendance.session_r = session
+        attendance.student_r = students #this is different from sqlalchemy ORM tutorial.
+                                        #Without this, student_id in attendance is None and cause error.
+        students.sessions.append(attendance)
         #commit
         self.session.commit()
         return True
 
-    def q_t_attendance(self):
-        result = self.session.query(Lessons, Attendance.homework, Attendance.score).\
-            options(joinedload(Lessons.courses).
-                    joinedload(Courses.students))
+    def score(self, score):
+        #check the existance
+        for attendance in self.session.query(Sessions).first().students:
+            print(attendance.attend)
+        
+        # give score
+        # attendance.score = score
+        # self.session.commit()
+        # return True
 
-        print(pd.read_sql(result.statement, con=engine))
-    def score(self):
-        return
-    def query_student(self):
-        return
-    def query_course(self):
-        return
+
     def test(self, name):
         student = self.session.query(Students).join(Students.courses).\
             filter(Courses.name==name).all()
@@ -280,5 +320,5 @@ class StudentMngr(Operations):
 
 if __name__ == '__main__':
     a = TeacherMngr()
-    a.test('python')
+    a.score(10)
 
