@@ -93,42 +93,6 @@ class ui(object):
     def s_login(self):
         enter = input('You can enter \'q\' to go back to previous section. \nOtherwise, enter your email address:')
         return enter
-    
-    def admin_view(self):
-        while True:
-            print(
-                '='*10,
-                '1. Register a teacher.',
-                '2. Free style.',
-                '3. Init table schema.',
-                '4. Go back.',
-                '5. Exit.',
-                '='*10,
-                sep='\n'
-            )
-            enter = input('Make a selection:')
-            if enter == '1':
-                self.add_teacher_view()
-                continue
-            elif enter == '2':
-                while True:
-                    self.mngr.connect()
-                    command = input('Key in the SQL command:').strip()
-                    if command=='q':
-                        self.mngr.dispose()
-                        break
-                    else:
-                        self.mngr.command(command)
-            elif enter == '3':
-                self.mngr.reboot()
-                print('db rebooted.', '='*10, sep='\n')
-                # print('THIS OPTION IS NOT IN USE, YET.')
-                # continue
-            elif enter == '4':
-                break
-            elif enter == '5':
-                sys.exit()
-
 
     def teacher_view(self ,name):
         while True:
