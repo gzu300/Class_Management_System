@@ -78,16 +78,6 @@ class ui(object):
         return
 
     def t_login(self):
-        # while True:
-        #     name = input('You can enter \'q\' to go back to previous section. \nOtherwise, enter your name:').strip()
-        #     if name == 'q':
-        #         break
-        #     else:
-        #         self.mngr = TeacherMngr()
-        #         if self.mngr.authenticate(name):
-        #             self.teacher_view(name)
-        #         else:
-        #             print('{0} is not in the record.'.format(name), '='*10, sep='\n')
         self._login(Mngrobj=TeacherMngr)
 
     def s_login(self):
@@ -202,7 +192,6 @@ class ui(object):
         self.mngr.rgt_teacher(enter)
         print('{0} has beed successully registered.'.format(enter), '='*10, sep='\n')
 
-
     @whileTrue_decorator    
     def add_lesson_view(self, lesson, course): 
         return self.mngr.rgt_lesson(lesson, course)
@@ -230,10 +219,13 @@ class ui(object):
     @doubleline_decorator
     def check_homework(self):
         return
+  
     def score(self):
         return
+  
     def submit_hw(self):
         return
+  
     @doubleline_decorator
     def check_rank(self):
         return
