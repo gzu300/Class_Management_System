@@ -1,7 +1,7 @@
 #coding=utf-8
 import sys
 import pandas as pd
-from .logic_layer import TeacherMngr, StudentMngr, Operations, AdminMngr
+from .logic_layer import TeacherMngr, StudentMngr, Operations
 
 def doubleline_decorator(func):
     def wrapper(*args, **kwargs):
@@ -45,7 +45,6 @@ class ui(object):
                 'Please select your category:', 
                 '1. Teacher', 
                 '2. Student',
-                #'3. Admin',
                 '4. Exit', 
                 '='*10,
                 sep='\n'
@@ -55,8 +54,6 @@ class ui(object):
                 self.t_login()
             elif cat == '2':
                 self.s_login()
-            # elif cat == '3':
-            #     self.a_login()
             elif cat == '4':
                 sys.exit()
             else:
@@ -72,10 +69,6 @@ class ui(object):
                 print('{0} is not in the record.'.format(name), '='*10, sep='\n')
                 continue
             getattr(self, self.mngr.view)(name) # Run TeacherMngr or StudentMngr
-
-    def a_login(self):
-        #self._login(Mngrobj=AdminMngr, user_view=self.admin_view)
-        return
 
     def t_login(self):
         # while True:

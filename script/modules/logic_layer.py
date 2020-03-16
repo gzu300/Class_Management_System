@@ -7,52 +7,6 @@ from ..conf.setting import engine
 import pandas as pd
 import os
 
-class AdminMngr(object):
-    pass
-'''
-    def __init__(self, user, password, host):
-        self.user = user
-        self.password = password
-        self.host = host
-    
-    def initialize(self):
-        tmp_engine = create_engine('mysql+mysqldb://{0}:{1}@{2}'.format(self.user, self.password, self.host), echo=True)
-        tmp_engine.execute('CREATE DATABASE IF NOT EXISTS class_management')
-        tmp_engine.dispose()
-
-        self.session = Session(bind=engine)
-
-    def reboot(self):
-        Base.metadata.create_all(engine)
-
-    def connect(self):
-        self.__engine = create_engine('mysql+mysqldb://{0}:{1}@{2}'.format(self.user, self.password, self.host), echo=True)
-
-    def command(self, command):
-        # engine = create_engine('mysql+mysqldb://root:sp880922@localhost', echo=True)
-        self.__engine.execute(command)
-
-    def dispose(self):
-        self.__engine.dispose()
-
-    def check_teacher(self, name):
-        Base.metadata.reflect(bind=engine)
-        print(Base.metadata.tables)
-        # metadata = MetaData()
-        # metadata.reflect(self.__engine)
-        # print(metadata)
-        #return result
-
-    def rgt_teacher(self, name):
-        pass
-    # def initialize(self):
-    #     if self.session.query(func.count(Teachers.id)).scalar() == 0:
-    #         print('Database is empty. Registering teacher Alex into system')
-    #         teacher = Teachers(name='Alex')
-    #         self.session.add(teacher)
-    #         self.session.commit()
-    #         self.session.close()
-'''
 class Operations(object):
     def __init__(self):
         self.session = Session(bind=engine)
@@ -100,7 +54,7 @@ class Operations(object):
         return True
 
 
-    def initialize(self):
+    def initialize(self).:
         if self.session.query(Teachers).count() == 0:
             print('Database is empty. Registering teacher Alex into system')
             teacher = Teachers(name='Alex')
