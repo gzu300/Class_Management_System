@@ -73,10 +73,6 @@ class ui(object):
                 continue
             getattr(self, self.mngr.view)(name) # Run TeacherMngr or StudentMngr
 
-    def a_login(self):
-        #self._login(Mngrobj=AdminMngr, user_view=self.admin_view)
-        return
-
     def t_login(self):
         self._login(Mngrobj=TeacherMngr)
 
