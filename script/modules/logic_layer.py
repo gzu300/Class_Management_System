@@ -7,6 +7,11 @@ from ..conf.setting import engine
 import pandas as pd
 import os
 
+class Test:
+    def show(self, the_list):
+        print(the_list)
+        return 'this is from logic_layer.py'
+
 class AdminMngr(object):
     pass
 '''
