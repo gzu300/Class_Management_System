@@ -29,13 +29,13 @@ Tea_Courses = Table(
     Column('course_id', Integer, ForeignKey('course.id'))
 )
 
-class Teachers(Base):
+class Teacher(Base):
     __tablename__ = "teacher"
 
     id = Column(Integer, primary_key=True)
     name = Column(String(20), nullable=False, unique=True)
 
-class Lessons(Base):
+class Lesson(Base):
     '''
     sessions.
     Usually different courses have different number of session.
@@ -46,16 +46,16 @@ class Lessons(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(10), nullable=False, unique=True)
 
-    courses = relationship('Courses', secondary='session', backref='lessons')
+    courses = relationship('Course', secondary='session', backref='lesson')
 
-class Courses(Base):
+class Course(Base):
     __tablename__ = 'course'
 
     id = Column(Integer, primary_key=True)
     name = Column(String(10), nullable=False, unique=True)
 
-    students = relationship('Students', secondary='student_m2m_course', backref='courses')
-    teachers = relationship('Teachers', secondary=Tea_Courses, backref='courses')#lazy='joined' makes the relationship query a joined table with original tables. to be verified.
+    students = relationship('Student', secondary='student_m2m_course', backref='course')
+    teachers = relationship('Teacher', secondary=Tea_Courses, backref='course')#lazy='joined' makes the relationship query a joined table with original tables. to be verified.
 
 class Attendance(Base): 
     '''
@@ -72,10 +72,10 @@ class Attendance(Base):
     stu_id = Column(Integer, ForeignKey('student.id'), primary_key=True)
     session_id = Column(Integer, ForeignKey('session.id'), primary_key=True)
 
-    session_r = relationship('Sessions', back_populates='students')
-    student_r = relationship('Students', back_populates='sessions')
+    session = relationship('Sessions', back_populates='student')
+    student = relationship('Student', back_populates='session')
 
-class Students(Base):
+class Student(Base):
     #left
     __tablename__ = 'student'
 
@@ -83,7 +83,7 @@ class Students(Base):
     name = Column(String(20), nullable=False)
     email = Column(String(50), nullable=False, unique=True)
 
-    sessions = relationship('Attendance', back_populates='student_r')
+    session = relationship('Attendance', back_populates='student')
 
 
 class Sessions(Base):
@@ -98,7 +98,7 @@ class Sessions(Base):
     courses_id =  Column(Integer, ForeignKey('course.id'))
     lessons_id = Column(Integer, ForeignKey('lesson.id'))
 
-    students = relationship('Attendance', back_populates='session_r')
+    student = relationship('Attendance', back_populates='session')
 
 
 Base.metadata.create_all(engine)

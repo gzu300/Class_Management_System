@@ -3,6 +3,7 @@ from abc import ABC, abstractclassmethod
 import sys
 import pandas as pd
 from .logic_layer import Test
+from .logic_layer_new import initialize
 
 '''
 This script deploys the factory pattern.
@@ -13,6 +14,7 @@ There are 2 factories:
 2. ExternalUIFactory.   Quries logic layer
                         responsible for interacting with logic layer and users.
                         Accepts various number of string inputs from users.
+                        it passes dict with {Entity:Name} pairs to logic layer.
 
 Every interface, internal and external, has a concrete instance and called in
 application.
@@ -76,7 +78,11 @@ class ExternalUIFactory(AbstractUI):
         user_response_list = self.get_user_response()
         self.retrieve_info(user_response_list)
 
+    def show_error(self):
+        pass
+
     def retrieve_info(self, input_list):
+        print(dict(zip(self._args, input_list)))
         logic_test = Test()
         self._logic_response = logic_test.show(input_list)
 
@@ -111,24 +117,28 @@ class TeacherUIFactory(ExternalUIFactory):
     def __init__(self, *args):
         ExternalUIFactory.__init__(self, 'TeacherView', *args)
 
-TeacherLogin = ExternalUIFactory('TeacherView', 'teacher')
+TeacherLogin = ExternalUIFactory('TeacherView', 'Teacher')
 
-Add_course = TeacherUIFactory('course')
-Add_student = TeacherUIFactory('course', 'student')
-Add_lesson = TeacherUIFactory('course', 'lesson')
-Add_attendance = TeacherUIFactory('course', 'lesson', 'student', 'attendance')
-Add_score = TeacherUIFactory('course', 'lesson', 'student', 'score')
+Add_course = TeacherUIFactory('Course')
+Add_student = TeacherUIFactory('Course', 'Student')
+Add_lesson = TeacherUIFactory('Course', 'Lesson')
+Add_attendance = TeacherUIFactory('Course', 'Lesson', 'Student', 'Attendance')
+Add_score = TeacherUIFactory('Course', 'Lesson', 'Student', 'Score')
 
-Search_course = TeacherUIFactory('course')
-Search_student = TeacherUIFactory('course', 'student')
-Search_lesson = TeacherUIFactory('course', 'lesson')
-Search_attendance = TeacherUIFactory('course', 'lesson', 'student', 'attendance')
-Search_score = TeacherUIFactory('course', 'lesson', 'student', 'score')
+Search_course = TeacherUIFactory('Course')
+Search_student = TeacherUIFactory('Course', 'Student')
+Search_lesson = TeacherUIFactory('Course', 'Lesson')
+Search_attendance = TeacherUIFactory('Course', 'Lesson', 'Student', 'Attendance')
+Search_score = TeacherUIFactory('Course', 'Lesson', 'Student', 'Score')
 
 #Students
-StudentLogin = ExternalUIFactory('StudentView', 'student')
+StudentLogin = ExternalUIFactory('StudentView', 'Student')
 
-Add_homework = ExternalUIFactory('StudentView', 'homework')
+Add_homework = ExternalUIFactory('StudentView', 'Homework')
+
+#####
+#Misc functios and classes
+#####
 
 
 def display_categories(category_dict):
@@ -164,6 +174,7 @@ def application(ui):
         'Lesson': Lesson,
         'Attendance': Attendance,
         'Score': Score,
+        'Homework': Homework,
 
         'TeacherLogin': TeacherLogin,
         'StudentLogin': StudentLogin,
@@ -188,6 +199,7 @@ def application(ui):
         'Quit': Quit(),
         'Back': Back()
     }
+    initialize()
     while True:
         app = UIs.get(ui)
         ui = app.run()

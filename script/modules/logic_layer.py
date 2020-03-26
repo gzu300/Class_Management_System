@@ -1,4 +1,5 @@
 #coding=utf-8
+from abc import ABC, abstractclassmethod
 from sqlalchemy.sql import exists
 from sqlalchemy.orm import Session, joinedload, subqueryload
 from sqlalchemy import func, create_engine, MetaData, inspect, and_
@@ -12,56 +13,10 @@ class Test:
         print(the_list)
         return 'this is from logic_layer.py'
 
-class AdminMngr(object):
-    pass
-'''
-    def __init__(self, user, password, host):
-        self.user = user
-        self.password = password
-        self.host = host
-    
-    def initialize(self):
-        tmp_engine = create_engine('mysql+mysqldb://{0}:{1}@{2}'.format(self.user, self.password, self.host), echo=True)
-        tmp_engine.execute('CREATE DATABASE IF NOT EXISTS class_management')
-        tmp_engine.dispose()
 
-        self.session = Session(bind=engine)
-
-    def reboot(self):
-        Base.metadata.create_all(engine)
-
-    def connect(self):
-        self.__engine = create_engine('mysql+mysqldb://{0}:{1}@{2}'.format(self.user, self.password, self.host), echo=True)
-
-    def command(self, command):
-        # engine = create_engine('mysql+mysqldb://root:sp880922@localhost', echo=True)
-        self.__engine.execute(command)
-
-    def dispose(self):
-        self.__engine.dispose()
-
-    def check_teacher(self, name):
-        Base.metadata.reflect(bind=engine)
-        print(Base.metadata.tables)
-        # metadata = MetaData()
-        # metadata.reflect(self.__engine)
-        # print(metadata)
-        #return result
-
-    def rgt_teacher(self, name):
-        pass
-    # def initialize(self):
-    #     if self.session.query(func.count(Teachers.id)).scalar() == 0:
-    #         print('Database is empty. Registering teacher Alex into system')
-    #         teacher = Teachers(name='Alex')
-    #         self.session.add(teacher)
-    #         self.session.commit()
-    #         self.session.close()
-'''
 class Operations(object):
     def __init__(self):
         self.session = Session(bind=engine)
-        self.initialize()
 
     def check(self, obj, c_name, name):
         '''
@@ -71,7 +26,6 @@ class Operations(object):
             result = self.session.query(obj).filter(getattr(obj, c_name)==name).first()
             return result
         
-
     def q_t(self, obj, related_c):
         '''
         Query and print obj and obj's related table.
@@ -104,14 +58,6 @@ class Operations(object):
         self.session.commit()
         return True
 
-
-    def initialize(self):
-        if self.session.query(Teachers).count() == 0:
-            print('Database is empty. Registering teacher Alex into system')
-            teacher = Teachers(name='Alex')
-            self.session.add(teacher)
-            self.session.commit()
-            self.session.close()
 
 class TeacherMngr(Operations):
     '''
@@ -324,6 +270,6 @@ class StudentMngr(Operations):
         return
 
 if __name__ == '__main__':
-    a = TeacherMngr()
-    a.score(10)
+    a = RegisterMngr()
+    a.process(Courses, 'python', name='python')
 
