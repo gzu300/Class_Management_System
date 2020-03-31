@@ -1,12 +1,12 @@
 from abc import ABC, abstractclassmethod
-from sqlalchemy.sql import exists
 from sqlalchemy.orm import Session, joinedload, subqueryload
 from sqlalchemy import func, create_engine, MetaData, inspect, and_
+from sqlalchemy.inspection import inspect
 from .create_schema import *
 from ..conf.setting import engine
+import sqlalchemy
 import pandas as pd
 import os
-
 '''
 Inputs from UI layer are in dict format. 
 Outputs for logic layer: for queries, return pandas df(empty df for None).
@@ -15,66 +15,61 @@ Outputs for logic layer: for queries, return pandas df(empty df for None).
 
 class BaseEntity(ABC):
     def __init__(self):
+        #format of input_list: [{'new_table':{'colname':'new_value'}}, {'related_table':'value'}]
         self.session = Session(bind=engine)
 
-    def _check(self, single_tuple, colname):
-        table_obj = eval(single_tuple[0])
-        entry = single_tuple[1]
-        result = self.session.query(table_obj).filter(getattr(table_obj, colname) == entry).first()
-        return result
+    def _get_columns(self, mapper):
+        return {mapper.class_.__name__: mapper.columns.keys()[1:]}
 
-    def _check_relationships(self, input_tuple, colname='name'):
-        result = dict((pair[0], self._check(pair, colname)) for pair in input_tuple) #check related instances first, if any existed, exit without checking instance to add
-        if not input_tuple:
-            print('no relationships')
-            return True
-        elif all(result.values()):
-            print('all related instances are registered. new instance is OK to be registered')
-            return True
-        print('related instances not registered.')
-        return False
+    def _release_items(self, user_response):
+        new_entry, *related_entry = user_response
+        self._new_tbl_name, *_ = new_entry
+        self._new_tbl_cols = new_entry[self._new_tbl_name]
+        return new_entry, related_entry
+
+    def _query(self, entry_dict):
+        result_list = []
+        for table, cols_value in entry_dict.items():
+            result_list.append(self.session.query(eval(table)).filter_by(**cols_value).first())
+        return result_list
+
+    def _add(self, entry_dict):
+        self._new_entry = eval(self._new_tbl_name)(**entry_dict[self._new_tbl_name])
+        try:
+            self.session.add(self._new_entry)
+            self.session.flush() #flush the db to test for exception
+        except sqlalchemy.exc.IntegrityError:
+            self.session.rollback()
+            print('registration failed due to entry already existed.')
+            return 
+        return self._new_entry
         
 
-class Courses(BaseEntity):
-    def register(self, input_dict, colname):
-        inst_to_add, *related_inst = input_dict.items()
-        # input_tuple = list(input_dict.items())[0]
-        new_existed= self._check(inst_to_add, colname)
-        relation_existed = self._check_relationships(related_inst, colname)
-        if (not new_existed) and relation_existed:
-            table, course_name = inst_to_add
-            new_inst = Course(name=course_name)
-            self.session.add(new_inst)
-            self.session.commit()
-    def query(self):
-        pass
+    def _append_relation(self, related_entry):
+        if not related_entry:
+            return
+        result = self._query(related_entry[0]) #there should be only one elemnt in the list...
+        try:
+            for related_obj in result:
+                getattr(related_obj, self._new_tbl_name.lower()).append(self._new_entry)
+        except AttributeError:
+            self.session.rollback()
+            print(f'registration failed since related column does not exist. register first.')
 
-class Students(BaseEntity):
-    def register(self, email, name, course_name):
-        course_checked = self._check(course_name)
-        student_checked = self._check(email)
-        if not course_checked:
-            return 'Course not existed.'
-        if not student_checked:
-            new_instance = Student(email=email, name=name)
-            course_checked.students.append(new_instance)
-            self.session.add(new_instance)
+    def register(self, user_response):
+        new_entry, related_entry = self._release_items(user_response)
+        added = self._add(new_entry)
+        if added:
+            self._append_relation(related_entry)
             self.session.commit()
-#     def query(self):
-#         pass
+            print('registration done')
 
-class Lessons:
-    pass
-class Attendances:
-    pass
-class Score:
-    pass
-class Homework:
-    pass
+
 
 #####
 #Functions
 #####
+
 def initialize():
     session = Session(bind=engine)
     if session.query(Teacher).count() == 0:
@@ -84,7 +79,16 @@ def initialize():
         session.commit()
         session.close()
 
+def get_columns(table):
+    return eval(table).__table__.c.keys()[1:]
+
+def get_mngr():
+    eval()
+
+
 if __name__ == '__main__':
-    a = Courses()
-    a.register({'Course': 'chinese'}, 'name')
+    a = BaseEntity()
+    a.register([{'Student': {'name': 'zhu', 'email': 'zhu.com'}}, {'Course': {'name': 'python'}}])
+    
+
 

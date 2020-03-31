@@ -5,6 +5,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, relationship
 from sqlalchemy import Table, Column, ForeignKey
 from sqlalchemy import Integer, String, Enum, Boolean
+from sqlalchemy.inspection import inspect
 
 Base = declarative_base()
 engine = engine
@@ -13,8 +14,8 @@ class Stu_Courses(Base):
     __tablename__ = 'student_m2m_course'
     
     id = Column(Integer, primary_key=True)
-    students_id = Column(Integer, ForeignKey('student.id'))
-    courses_id = Column(Integer, ForeignKey('course.id'))
+    student_id = Column(Integer, ForeignKey('student.id'))
+    course_id = Column(Integer, ForeignKey('course.id'))
 
 # class Tea_Courses(Base):
 #     __tablename__ = 'teacher_m2m_course'
@@ -37,8 +38,8 @@ class Teacher(Base):
 
 class Lesson(Base):
     '''
-    sessions.
-    Usually different courses have different number of session.
+    sections.
+    Usually different courses have different number of section.
     But here we assume all courses have same number duration.
     '''
     __tablename__ = 'lesson'
@@ -46,7 +47,7 @@ class Lesson(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(10), nullable=False, unique=True)
 
-    courses = relationship('Course', secondary='session', backref='lesson')
+    course = relationship('Course', secondary='section', backref='lesson')
 
 class Course(Base):
     __tablename__ = 'course'
@@ -54,13 +55,13 @@ class Course(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(10), nullable=False, unique=True)
 
-    students = relationship('Student', secondary='student_m2m_course', backref='course')
-    teachers = relationship('Teacher', secondary=Tea_Courses, backref='course')#lazy='joined' makes the relationship query a joined table with original tables. to be verified.
+    student = relationship('Student', secondary='student_m2m_course', backref='course')
+    teacher = relationship('Teacher', secondary=Tea_Courses, backref='course')#lazy='joined' makes the relationship query a joined table with original tables. to be verified.
 
 class Attendance(Base): 
     '''
-    records attendance of each student for each session
-    sessions_lessons m_to_m relationship set. 
+    records attendance of each student for each section
+    sections_lessons m_to_m relationship set. 
     Additional attributes: homework, present_bool, score
     '''
     __tablename__ = 'attendance'
@@ -70,10 +71,10 @@ class Attendance(Base):
     attend = Column(Boolean)
 
     stu_id = Column(Integer, ForeignKey('student.id'), primary_key=True)
-    session_id = Column(Integer, ForeignKey('session.id'), primary_key=True)
+    section_id = Column(Integer, ForeignKey('section.id'), primary_key=True)
 
-    session = relationship('Sessions', back_populates='student')
-    student = relationship('Student', back_populates='session')
+    section = relationship('Section', back_populates='student')
+    student = relationship('Student', back_populates='section')
 
 class Student(Base):
     #left
@@ -83,27 +84,27 @@ class Student(Base):
     name = Column(String(20), nullable=False)
     email = Column(String(50), nullable=False, unique=True)
 
-    session = relationship('Attendance', back_populates='student')
+    section = relationship('Attendance', back_populates='student')
 
 
-class Sessions(Base):
+class Section(Base):
     #right
     '''
-    records sessions for each course.
+    records sections for each course.
     Courses_Lessons m_to_m relationship set. 
     '''
-    __tablename__ = 'session'
+    __tablename__ = 'section'
 
     id = Column(Integer, primary_key=True)
     courses_id =  Column(Integer, ForeignKey('course.id'))
     lessons_id = Column(Integer, ForeignKey('lesson.id'))
 
-    student = relationship('Attendance', back_populates='session')
+    student = relationship('Attendance', back_populates='section')
 
 
 Base.metadata.create_all(engine)
 
-
-
-
-
+if __name__ == '__main__':
+    mapper = inspect(Lesson)
+    print(mapper.relationships.values()[0].entity.class_.__name__)
+    print(mapper.relationships.values()[0].entity.columns.keys()[1:])

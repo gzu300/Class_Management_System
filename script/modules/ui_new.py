@@ -3,7 +3,7 @@ from abc import ABC, abstractclassmethod
 import sys
 import pandas as pd
 from .logic_layer import Test
-from .logic_layer_new import initialize
+from .logic_layer_new import *
 
 '''
 This script deploys the factory pattern.
@@ -18,6 +18,14 @@ There are 2 factories:
 
 Every interface, internal and external, has a concrete instance and called in
 application.
+
+28/03/2020
+todo:
+1. related columns can be retrieved from inspect function. 
+So arguments in ExternalUIFactory for relationship is not needed.
+2. implement _retrieve_relationships methods
+3. in logic layer. finish _release_items method.
+4. then finish the higher level methods '_check_relationships' for related entities.
 '''
 ####
 #Abstract UI
@@ -63,34 +71,46 @@ class InternalUIFactory(AbstractUI):
 #####
 
 class ExternalUIFactory(AbstractUI):
-    def __init__(self, next_ui, *args):
+    def __init__(self, next_ui, func, *args):
         self.next_ui = next_ui
-        self._args = args
+        self._new, *self._related = args
+        self._func = '_'+func
+        self._mngr = eval(self._new)()
 
     def display(self):
         pass
 
-    def get_user_response(self):
-        user_response_list = [input(f'Enter {each} information:').strip().lower() for each in self._args]
-        return user_response_list
+    def get_user_add_response(self):
+        #There might be multiple inputs to create a new table. 
+        #For example Student table needs email and name.
+        #this generates a dictionary for new table with {'table_name': {colname: value}}.
+        #'related_entries' is a dictionary of related tableS with {'table_name': {colname: value}}
+        new_entries = [gather_one_response(self._new)]
+        related_entries = gather_multiple_responses(self._related) #funcs in logic layer
+        #concat into a single list.
+        self._user_response = new_entries + related_entries
 
     def generate_next_ui(self):
-        user_response_list = self.get_user_response()
-        self.retrieve_info(user_response_list)
+        #generate next ui according to logic layer's response.
+        result = self.interact_add_request()
+        print(result)
 
-    def show_error(self):
+        
+    def interact_add_request(self):
+        #send user_response to logic layer and get reply
+        return self._mngr.register(self._user_response)
+        
+
+    def _add(self):
+        self.display()
+        self.get_user_add_response()
+        self.generate_next_ui()
+
+    def _query(self):
         pass
 
-    def retrieve_info(self, input_list):
-        print(dict(zip(self._args, input_list)))
-        logic_test = Test()
-        self._logic_response = logic_test.show(input_list)
-
     def run(self):
-        self._logic_response = None
-        while not self._logic_response:
-            self.display()
-            self.generate_next_ui()
+        getattr(self, self._func)()
         return self.next_ui
 
 #####
@@ -100,12 +120,12 @@ class ExternalUIFactory(AbstractUI):
 Welcome = InternalUIFactory({'1': 'TeacherLogin', '2': 'StudentLogin', 'q': 'Quit'})
 Teacher_view = InternalUIFactory({'1': 'Student', '2': 'Course', '3': 'Lesson', '4': 'Attendance', '5': 'Score', 'q': 'Quit'})
 Student_view = InternalUIFactory({'1': 'Homework'})
-Student = InternalUIFactory({'1': 'Add_student', '2': 'Search_student', 'b': 'Back', 'q': 'Quit'})
-Course = InternalUIFactory({'1': 'Add_course', '2': 'Search_course', 'b': 'Back', 'q': 'Quit'})
-Lesson = InternalUIFactory({'1': 'Add_lesson', '2': 'Search_lesson', 'b': 'Back', 'q': 'Quit'})
-Attendance = InternalUIFactory({'1': 'Add_attendance', '2': 'Search_attendance', 'b': 'Back', 'q': 'Quit'})
-Score = InternalUIFactory({'1': 'Add_score', '2': 'Search_score', 'b': 'Back', 'q': 'Quit'})
-Homework = InternalUIFactory({'1': 'Add_homework'})
+Student_op = InternalUIFactory({'1': 'Add_student', '2': 'Search_student', 'b': 'Back', 'q': 'Quit'})
+Course_op = InternalUIFactory({'1': 'Add_course', '2': 'Search_course', 'b': 'Back', 'q': 'Quit'})
+Lesson_op = InternalUIFactory({'1': 'Add_lesson', '2': 'Search_lesson', 'b': 'Back', 'q': 'Quit'})
+Attendance_op = InternalUIFactory({'1': 'Add_attendance', '2': 'Search_attendance', 'b': 'Back', 'q': 'Quit'})
+Score_op = InternalUIFactory({'1': 'Add_score', '2': 'Search_score', 'b': 'Back', 'q': 'Quit'})
+Homework_op = InternalUIFactory({'1': 'Add_homework'})
 
 
 #####
@@ -117,24 +137,24 @@ class TeacherUIFactory(ExternalUIFactory):
     def __init__(self, *args):
         ExternalUIFactory.__init__(self, 'TeacherView', *args)
 
-TeacherLogin = ExternalUIFactory('TeacherView', 'Teacher')
+TeacherLogin = ExternalUIFactory('TeacherView', 'query', 'Teachers')
 
-Add_course = TeacherUIFactory('Course')
-Add_student = TeacherUIFactory('Course', 'Student')
-Add_lesson = TeacherUIFactory('Course', 'Lesson')
-Add_attendance = TeacherUIFactory('Course', 'Lesson', 'Student', 'Attendance')
-Add_score = TeacherUIFactory('Course', 'Lesson', 'Student', 'Score')
+Add_course = TeacherUIFactory('add', 'Courses')
+Add_student = TeacherUIFactory('add', 'Students', 'Courses')
+Add_lesson = TeacherUIFactory('add', 'Lessons', 'Courses')
+# Add_attendance = TeacherUIFactory('add', 'Attendances')
+# Add_score = TeacherUIFactory('add', 'Scores')
 
-Search_course = TeacherUIFactory('Course')
-Search_student = TeacherUIFactory('Course', 'Student')
-Search_lesson = TeacherUIFactory('Course', 'Lesson')
-Search_attendance = TeacherUIFactory('Course', 'Lesson', 'Student', 'Attendance')
-Search_score = TeacherUIFactory('Course', 'Lesson', 'Student', 'Score')
+# Search_course = TeacherUIFactory('query', 'Courses')
+# Search_student = TeacherUIFactory('query', 'Students')
+# Search_lesson = TeacherUIFactory('query', 'Lessons')
+# Search_attendance = TeacherUIFactory('query', 'Attendances')
+# Search_score = TeacherUIFactory('query', 'Scores')
 
 #Students
-StudentLogin = ExternalUIFactory('StudentView', 'Student')
+StudentLogin = ExternalUIFactory('StudentView', 'query', 'Students')
 
-Add_homework = ExternalUIFactory('StudentView', 'Homework')
+Add_homework = ExternalUIFactory('StudentView', 'add', 'Homeworks')
 
 #####
 #Misc functios and classes
@@ -149,6 +169,13 @@ def display_categories(category_dict):
     for key, value in category_dict.items():
         print(key, value)
     print('='*10)
+
+def gather_one_response(table):
+    table_schema = table[:-1] #table schema is in singular
+    return {table_schema: {each: input(f'Enter {table_schema}\'s {each} information: ') for each in get_columns(table_schema)}}
+
+def gather_multiple_responses(table_list):
+    return [gather_one_response(obj) for obj in table_list]
 
 class Quit:
     def run(self):
@@ -169,30 +196,30 @@ def application(ui):
         'TeacherView': Teacher_view,
         'StudentView': Student_view,
 
-        'Student': Student,
-        'Course': Course,
-        'Lesson': Lesson,
-        'Attendance': Attendance,
-        'Score': Score,
-        'Homework': Homework,
+        'Student': Student_op,
+        'Course': Course_op,
+        'Lesson': Lesson_op,
+        'Attendance': Attendance_op,
+        'Score': Score_op,
+        'Homework': Homework_op,
 
         'TeacherLogin': TeacherLogin,
         'StudentLogin': StudentLogin,
 
         'Add_course': Add_course,
-        'Search_course': Search_course,
+        # 'Search_course': Search_course,
 
         'Add_student': Add_student,
-        'Search_student': Search_student,
+        # 'Search_student': Search_student,
 
         'Add_lesson': Add_lesson,
-        'Search_lesson': Search_lesson,
+        # 'Search_lesson': Search_lesson,
 
-        'Add_attendance': Add_attendance,
-        'Search_attendance': Search_attendance,
+        # 'Add_attendance': Add_attendance,
+        # 'Search_attendance': Search_attendance,
 
-        'Add_score': Add_score,
-        'Search_score': Search_score,
+        # 'Add_score': Add_score,
+        # 'Search_score': Search_score,
 
         'Add_homework': Add_homework,
 
@@ -206,7 +233,9 @@ def application(ui):
 
 
 if __name__ == '__main__':
-    application('Welcome')
+    # application('Welcome')
+    a = TeacherUIFactory('add', 'Courses', 'Students')
+    print(a.run())
 
 
 
