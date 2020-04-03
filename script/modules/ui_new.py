@@ -18,21 +18,13 @@ There are 2 factories:
 
 Every interface, internal and external, has a concrete instance and called in
 application.
-
-28/03/2020
-todo:
-1. related columns can be retrieved from inspect function. 
-So arguments in ExternalUIFactory for relationship is not needed.
-2. implement _retrieve_relationships methods
-3. in logic layer. finish _release_items method.
-4. then finish the higher level methods '_check_relationships' for related entities.
 '''
 ####
 #Abstract UI
 ####
 class AbstractUI(ABC):
     @abstractclassmethod
-    def display(self):
+    def get_user_response(self):
         pass
     @abstractclassmethod
     def generate_next_ui(self):
@@ -71,47 +63,64 @@ class InternalUIFactory(AbstractUI):
 #####
 
 class ExternalUIFactory(AbstractUI):
-    def __init__(self, next_ui, func, *args):
+    def __init__(self, next_ui, *args):
         self.next_ui = next_ui
-        self._new, *self._related = args
-        self._func = '_'+func
-        self._mngr = eval(self._new)()
+        self._args = args
+        self._mngr = eval(args[0]+'Mngr')
 
-    def display(self):
+    @abstractclassmethod
+    def generate_next_ui(self):
         pass
 
-    def get_user_add_response(self):
+    def get_user_response(self):
         #There might be multiple inputs to create a new table. 
         #For example Student table needs email and name.
         #this generates a dictionary for new table with {'table_name': {colname: value}}.
         #'related_entries' is a dictionary of related tableS with {'table_name': {colname: value}}
-        new_entries = [gather_one_response(self._new)]
-        related_entries = gather_multiple_responses(self._related) #funcs in logic layer
-        #concat into a single list.
-        self._user_response = new_entries + related_entries
 
-    def generate_next_ui(self):
-        #generate next ui according to logic layer's response.
-        result = self.interact_add_request()
-        print(result)
-
-        
-    def interact_add_request(self):
-        #send user_response to logic layer and get reply
-        return self._mngr.register(self._user_response)
-        
-
-    def _add(self):
-        self.display()
-        self.get_user_add_response()
-        self.generate_next_ui()
-
-    def _query(self):
-        pass
+        user_response = gather_multiple_responses(self._args) #funcs in logic layer
+        self._user_response = user_response
 
     def run(self):
-        getattr(self, self._func)()
+        self.get_user_response()
+        self.generate_next_ui()
         return self.next_ui
+
+
+class AuthFactory(ExternalUIFactory):
+
+    def generate_next_ui(self):
+        existed = self._mngr.auth(ExternalUIFactory.role)[0]
+        if existed:
+            self.next_ui = 'TeacherView'
+            return
+        self.next_ui = 'Welcome'
+
+    def get_user_response(self):
+        ExternalUIFactory.role = gather_one_response(self._args[0])
+        print(ExternalUIFactory.role)
+
+    def run(self):
+        self.get_user_response()
+        # self.generate_next_ui()
+        return self.next_ui
+
+class AddFactory(ExternalUIFactory):
+    def generate_next_ui(self):
+        pass
+    def get_user_response(self):
+        self._user_response = gather_multiple_responses(self._args)
+    def send_user_response(self):
+        self._mngr.add(self._user_response)
+
+    def run(self):
+        self.get_user_response()
+        print(self._user_response)
+        breakpoint()
+        self.send_user_response()
+        return self.next_ui
+
+
 
 #####
 #Concrete Internal UIs
@@ -133,16 +142,16 @@ Homework_op = InternalUIFactory({'1': 'Add_homework'})
 #####
 
 #Teachers
-class TeacherUIFactory(ExternalUIFactory):
-    def __init__(self, *args):
-        ExternalUIFactory.__init__(self, 'TeacherView', *args)
+# class TeacherUIFactory(AddUIFactory):
+#     def __init__(self, *args):
+#         AddUIFactory.__init__(self, 'TeacherView', *args)
 
-TeacherLogin = ExternalUIFactory('TeacherView', 'query', 'Teachers')
+TeacherLogin = AuthFactory('TeacherView', 'Teacher')
 
-Add_course = TeacherUIFactory('add', 'Courses')
-Add_student = TeacherUIFactory('add', 'Students', 'Courses')
-Add_lesson = TeacherUIFactory('add', 'Lessons', 'Courses')
-# Add_attendance = TeacherUIFactory('add', 'Attendances')
+# Add_course = TeacherUIFactory('CourseMngr')
+# Add_student = TeacherUIFactory('Students', 'Courses')
+# Add_lesson = TeacherUIFactory('Lessons', 'Courses')
+# Add_attendance = TeacherUIFactory('Attendances', 'Sections', 'Students')
 # Add_score = TeacherUIFactory('add', 'Scores')
 
 # Search_course = TeacherUIFactory('query', 'Courses')
@@ -152,9 +161,9 @@ Add_lesson = TeacherUIFactory('add', 'Lessons', 'Courses')
 # Search_score = TeacherUIFactory('query', 'Scores')
 
 #Students
-StudentLogin = ExternalUIFactory('StudentView', 'query', 'Students')
+# StudentLogin = ExternalUIFactory('StudentView', 'query', 'Students')
 
-Add_homework = ExternalUIFactory('StudentView', 'add', 'Homeworks')
+# Add_homework = ExternalUIFactory('StudentView', 'add', 'Homeworks')
 
 #####
 #Misc functios and classes
@@ -170,12 +179,11 @@ def display_categories(category_dict):
         print(key, value)
     print('='*10)
 
-def gather_one_response(table):
-    table_schema = table[:-1] #table schema is in singular
+def gather_one_response(table_schema):
     return {table_schema: {each: input(f'Enter {table_schema}\'s {each} information: ') for each in get_columns(table_schema)}}
 
 def gather_multiple_responses(table_list):
-    return [gather_one_response(obj) for obj in table_list]
+    return {gather_one_response(obj) for obj in table_list}
 
 class Quit:
     def run(self):
@@ -204,16 +212,16 @@ def application(ui):
         'Homework': Homework_op,
 
         'TeacherLogin': TeacherLogin,
-        'StudentLogin': StudentLogin,
+        # 'StudentLogin': StudentLogin,
 
-        'Add_course': Add_course,
-        # 'Search_course': Search_course,
+        # 'Add_course': Add_course,
+        # # 'Search_course': Search_course,
 
-        'Add_student': Add_student,
-        # 'Search_student': Search_student,
+        # 'Add_student': Add_student,
+        # # 'Search_student': Search_student,
 
-        'Add_lesson': Add_lesson,
-        # 'Search_lesson': Search_lesson,
+        # 'Add_lesson': Add_lesson,
+        # # 'Search_lesson': Search_lesson,
 
         # 'Add_attendance': Add_attendance,
         # 'Search_attendance': Search_attendance,
@@ -221,7 +229,7 @@ def application(ui):
         # 'Add_score': Add_score,
         # 'Search_score': Search_score,
 
-        'Add_homework': Add_homework,
+        # 'Add_homework': Add_homework,
 
         'Quit': Quit(),
         'Back': Back()
@@ -234,8 +242,8 @@ def application(ui):
 
 if __name__ == '__main__':
     # application('Welcome')
-    a = TeacherUIFactory('add', 'Courses', 'Students')
-    print(a.run())
 
+    a = AddFactory('TeacherView', 'Student', 'Course')
+    a.run()
 
 
