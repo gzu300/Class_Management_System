@@ -24,58 +24,16 @@ class BaseEntity(ABC):
     def __init__(self):
         #format of input_list: [{'new_table':{'colname':'new_value'}}, {'related_table':'value'}]
         self.session = Session(bind=engine)
+    @abstractclassmethod
+    def add(self):
+        pass
+    @abstractclassmethod
+    def query(self):
+        pass
+    @abstractclassmethod
+    def update(self):
+        pass
 
-    def _get_columns(self, mapper):
-        return {mapper.class_.__name__: mapper.columns.keys()[1:]}
-
-    def _release_items(self, user_response):
-        new_entry, *related_entry = user_response
-        self._new_tbl_name, *_ = new_entry
-        self._new_tbl_cols = new_entry[self._new_tbl_name]
-        return new_entry, related_entry
-
-    def _query(self, entry_dict):
-        result_list = []
-        for table, cols_value in entry_dict.items():
-            result_list.append(self.session.query(eval(table)).filter_by(**cols_value).first())
-        return result_list
-
-    def _add(self, entry_dict):
-        self._new_entry = eval(self._new_tbl_name)(**entry_dict[self._new_tbl_name])
-        try:
-            self.session.add(self._new_entry)
-            self.session.flush() #flush the db to test for exception
-        except sqlalchemy.exc.IntegrityError:
-            self.session.rollback()
-            print('registration failed due to entry already existed.')
-            return 
-        return self._new_entry
-
-    def _get_related_col(self, obj, related_table_name):
-        return  getattr(obj, related_table_name.lower())  
-
-    def _append_relation(self, related_entry):
-        if not related_entry:
-            return
-        result = self._query(related_entry[0]) #there should be only one elemnt in the list...
-        try:
-            for related_obj in result: #related_obj is None if no record found. will raise AttributeError
-                related = self._get_related_col(related_obj, self._new_tbl_name)
-                related.append(self._new_entry)
-        except AttributeError:
-            self.session.rollback()
-            print(f'registration failed since related column does not exist. register first.')
-
-    def register(self, user_response):
-        new_entry, related_entry = self._release_items(user_response)
-        added = self._add(new_entry)
-        if added:
-            self._append_relation(related_entry)
-            self.session.commit()
-            print('registration done')
-
-    def auth(self, user_response):
-        return self._query(user_response)
 
 class TeacherMngr(BaseEntity):
     def query(self, user_response):
@@ -84,12 +42,25 @@ class TeacherMngr(BaseEntity):
 
         return teacher
 
+    def update(self):
+        pass
+
 class CourseMngr(BaseEntity):
     def add(self, user_response):
         course = user_response['Course']
         course = Course(**course)
         self.session.add(course)
         self.session.commit()
+
+    def query(self, user_response):
+        result = self.session.query(Course)
+        if not result.first():
+            return 'No results found.'
+        df = pd.read_sql(result.statement, con=engine)
+        return df
+
+    def update(self):
+        pass
 
 class StudentMngr(BaseEntity):
     def add(self, user_response):
@@ -174,6 +145,9 @@ class AttendanceMngr(BaseEntity):
         pass
     def query(self):
         pass
+
+class ScoreMngr(BaseEntity):
+    pass
 
 
 #####
