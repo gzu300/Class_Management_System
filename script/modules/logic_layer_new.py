@@ -21,49 +21,75 @@ THIS IS THE LESSON TO BE LEARNED!!!!!
 '''
 
 class BaseEntity(ABC):
-    def __init__(self):
+    def __init__(self, user_response):
         #format of input_list: [{'new_table':{'colname':'new_value'}}, {'related_table':'value'}]
         self.session = Session(bind=engine)
-    @abstractclassmethod
+        self._user_response = user_response
+
     def add(self):
         pass
-    @abstractclassmethod
+
     def query(self):
         pass
-    @abstractclassmethod
-    def update(self):
-        pass
-
-
-class TeacherMngr(BaseEntity):
-    def query(self, user_response):
-        teacher_name = user_response['Teacher']['name']
-        teacher = self.session.query(Teacher).filter(Teacher.name==teacher_name).one_or_none()
-
-        return teacher
 
     def update(self):
         pass
 
-class CourseMngr(BaseEntity):
-    def add(self, user_response):
-        course = user_response['Course']
-        course = Course(**course)
-        self.session.add(course)
-        self.session.commit()
+    def _check_entry_existance(self, table_name, clause_col):
+        obj = eval(table_name)
+        columns = self._user_response[table_name]
+        return self.session.query(exists().where(getattr(obj, clause_col)==columns[clause_col])).one()[0]
 
-    def query(self, user_response):
-        result = self.session.query(Course)
-        if not result.first():
+    def _get_student(self, columns):
+        return self.session.query(Student).filter_by(**columns)
+
+    def _get_course_instance(self, course_name):
+        return self.session.query(Course).filter(Course.name==course_name).one_or_none()
+
+    def _get_section(self, course_name, lesson_name):
+        section_subquery_stmt = self.session.query(
+            Course.id.label('course_id'), Lesson.id.label('lesson_id')
+        ).filter(Course.name==course_name, Lesson.name==lesson_name).subquery()
+
+        section, *_ = self.session.query(Section, section_subquery_stmt).\
+            filter(
+                Section.courses_id==section_subquery_stmt.c.course_id,
+                Section.lessons_id==section_subquery_stmt.c.lesson_id
+            )
+        return section
+
+    def _get_attendance(self, student, section):
+        student_subquery = student.subquery()
+        section_subquery = section.subquery()
+        attendance, *_ = self.session.query(Attendance, student_subquery, section_subquery).\
+            filter(
+                Attendance.section_id==section_subquery.id,
+                Attendance.stu_id==student_subquery.id
+            )
+        return attendance
+
+    def _query_raw(self):
+        student_columns = self._user_response['Student']
+        course_name = self._user_response['Course']['name']
+        lesson_name = self._user_response['Lesson']['name']
+
+        student = self._get_student(student_columns)
+        if not student.one_or_none():
+            return 'Error. Student: {0}, email: {1} not found.'.format(student['name'], student['email'])
+        section = self._get_section(course_name, lesson_name)
+        if not section.one_or_none():
+            return f'Error. {course_name} and/or {lesson_name} registered.'
+        return self._get_attendance(student, section)
+        
+
+    def _to_df(self, query_obj):
+        if not query_obj.first():
             return 'No results found.'
-        df = pd.read_sql(result.statement, con=engine)
+        df = pd.read_sql(query_obj.statement, con=engine)
         return df
 
-    def update(self):
-        pass
-
 class StudentMngr(BaseEntity):
-    def add(self, user_response):
+    def add(self):
         '''
         logic:
         create a new student instance;
@@ -71,30 +97,60 @@ class StudentMngr(BaseEntity):
         query section where 'course' name is the same as student.course; Note: There are multiple instances;
         append section to student in order to update attendance.
         '''
-        student = user_response['Student']
-        course_name = user_response['Course']['name']
+        student = self._user_response['Student']
+        course_name = self._user_response['Course']['name']
+
+        new_entry_exist = self._check_entry_existance('Student', 'email')
+        if new_entry_exist:
+            return 'Student name: {1}, email: {0} already existed.'.format(student['email'], student['name'])
+
+        course = self._get_course_instance(course_name)
+        if not course:
+            return f'Course {course_name} does not exist.'
+
+        section_list = self._get_sections_from_course(course_name)
+        if not section_list:
+            return f'Course {course_name} has no registered lessons.'
 
         student = Student(**student)
-        course = self.session.query(Course).filter(Course.name==course_name).one_or_none()
         student.course = [course]
-
-        section_subquery_stmt = self.session.query(Course.id.label('course_id')).\
-            filter(Course.name==course.name).subquery()
-        section_stmt_list = self.session.query(Section, section_subquery_stmt).\
-            filter(Section.courses_id==section_subquery_stmt.c.course_id).all() 
-        section_list = [section for section, stmt in section_stmt_list]
-
         student.section = section_list
         self.session.add(student)
         self.session.commit()
+        return student
+    
+    def _get_sections_from_course(self, course_name):
 
-    def update(self):
-        pass
+        section_subquery_stmt = self.session.query(Course.id.label('course_id')).\
+            filter(Course.name==course_name).subquery()
+        section_stmt_list = self.session.query(Section, section_subquery_stmt).\
+            filter(Section.courses_id==section_subquery_stmt.c.course_id).all() 
+        section_list = [section for section, stmt in section_stmt_list]
+        
+        return section_list
+
+    
+
+class TeacherMngr(BaseEntity):
     def query(self):
-        pass
+        return self._check_entry_existance('Teacher', 'name')
+
+class CourseMngr(BaseEntity):
+    def add(self):
+        course = self._user_response['Course']
+        course = Course(**course)
+        self.session.add(course)
+        self.session.commit()
+
+    def query(self):
+        course_name = self._user_response['Course']
+        result =  self.session.query(Course).filter_by(**course_name)
+
+        return self._to_df(result)
+        
 
 class LessonMngr(BaseEntity):
-    def add(self, user_response):
+    def add(self):
         '''
         logic:
         create a new lesson instance;
@@ -103,51 +159,101 @@ class LessonMngr(BaseEntity):
         query student which has the same 'course' name. Note: there are multiple student instances.
         append students to section so that attendance is added.
         '''
-        lesson = user_response['Lesson']
-        course_name = user_response['Course']['name']
+        lesson = self._user_response['Lesson']
+        course_name = self._user_response['Course']['name']
+
+        new_entry_exist = self._check_entry_existance('Lesson', 'name')
+        if new_entry_exist:
+            return 'lesson {0} already exist'.format(lesson['name'])
+
+        course = self._get_course_instance(course_name)
+        if not course:
+            return f'course {course_name} does not exist.'
+
+        section, student_list = self._get_students_section_from_course(course_name, lesson['name'])
+        if not student_list:
+            return f'Course {course_name} has no registered students.'
 
         lesson = Lesson(**lesson)
-        course = self.session.query(Course).filter(Course.name==course_name).one_or_none()
         lesson.course = [course]
+        section.student = student_list
+        self.session.add(lesson)
+        self.session.commit()
+        return lesson
+
+    def _get_students_section_from_course(self, course_name, lesson_name):
 
         student_list = self.session.query(Student).join(Student.course).\
             filter(Course.name==course_name).all()
 
-        section_subquery_stmt = self.session.query(
-            Course.id.label('course_id'), Lesson.id.label('lesson_id')
-        ).filter(Course.name==course.name, Lesson.name==lesson.name).subquery()
-
-        section, *_ = self.session.query(Section, section_subquery_stmt).\
-            filter(
-                Section.courses_id==section_subquery_stmt.c.course_id,
-                Section.lessons_id==section_subquery_stmt.c.lesson_id
-            ).one_or_none()
-
-        section.student = student_list
-        self.session.add(lesson)
-        self.session.commit()
-
-    def update(self):
-        pass
-    def query(self):
-        pass
-
+        section = self._get_section(course_name, lesson_name)
+        
+        return (section, student_list)
 
 
 class AttendanceMngr(BaseEntity):
-    def add(self):
-        '''
-        attendance is added automatically whenever there is a new 'lesson' or 'student' instance.
-        '''
-        pass
+    '''
+    attendance is added automatically whenever there is a new 'lesson' or 'student' instance.
+    ''' 
+    
 
     def update(self):
-        pass
+        
+        attendance = self._query_raw().one_or_none()
+        if isinstance(attendance, str):
+            return attendance
+
+        attendance.attend = self._user_response['Attendance']['attend']
+        self.session.commit()
+        return attendance
+        
+
+
     def query(self):
-        pass
+        attendance = self._query_raw().statement
+        df = self._to_df(attendance)
+        if df.empty:
+            return 'Combination of lesson, course and student not found.'
+        return df
+
 
 class ScoreMngr(BaseEntity):
-    pass
+    def update(self):
+        
+        attendance = self._query_raw().one_or_none()
+        if isinstance(attendance, str):
+            return attendance
+
+        attendance.score = self._user_response['Attendance']['attend']
+        self.session.commit()
+        return attendance
+
+    def query(self):
+        '''
+        order student.name and student.score by score according to course.
+        '''
+        # student_columns = self._user_response['Student']
+        course_name = self._user_response['Course']['name']
+        # lesson_name = self._user_response['Lesson']['name']
+
+        # student = self._get_student(student_columns)
+        # course = self._get_course_instance(course_name)
+        # lesson = self._get_lesson(lesson_name).one_or_none()
+        # section = self._get_section(course_name, lesson_name)
+        # attendance = self._get_attendance(student, section)
+
+        course = self.session.query(Course.id, Student.name.label('student_name')).filter(Course.name==course_name).subquery()
+
+
+        section = self.session.query(Section.id.label('section_id'), Course.name.label('course_name'), course.c.student_name.label('student_name')).\
+            filter(Section.courses_id==course.c.id).subquery()
+
+        result = self.session.query(Attendance.score, section.c.course_name, section.c.student_name).\
+            join(section, Attendance.section_id==section.c.section_id)
+
+        print(self._to_df(result))
+
+        
 
 
 #####
@@ -172,9 +278,12 @@ def query_student(obj, **kwargs):
 
 
 if __name__ == '__main__':
-    course = CourseMngr()
-    student = StudentMngr()
-    lesson = LessonMngr()
+    a = ScoreMngr({'Course': {'name': 'python'}})
+    print(a.query())
+
+    # course = CourseMngr()
+    # student = StudentMngr()
+    # lesson = LessonMngr()
     # course.add({'Course':{'name': 'python'}})
 
     # student.add({'Student': {'email': 'zhu.com', 'name': 'zhu'}, 'Course': {'name': 'python'}})

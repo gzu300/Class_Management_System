@@ -66,7 +66,7 @@ class ExternalUIFactory(AbstractUI):
     def __init__(self, next_ui, *args):
         self.next_ui = next_ui
         self._args = args
-        self._mngr = eval(args[0]+'Mngr')()
+        
 
     @abstractclassmethod
     def generate_next_ui(self):
@@ -79,6 +79,7 @@ class ExternalUIFactory(AbstractUI):
         #'related_entries' is a dictionary of related tableS with {'table_name': {colname: value}}
 
         self._user_response = gather_multiple_responses(self._args) #funcs in logic layer
+        self._mngr = eval(self._args[0]+'Mngr')(self._user_response)
         return self._user_response
 
     def run(self):
@@ -106,14 +107,12 @@ class QueryFactory(ExternalUIFactory):
 
 class AddFactory(ExternalUIFactory):
     def generate_next_ui(self):
-        pass
-
-    def send_user_response(self):
-        self._mngr.add(self._user_response)
+        result = self._mngr.add(self._user_response)
+        print(result)
 
     def run(self):
         self.get_user_response()
-        self.send_user_response()
+        self.generate_next_ui()
         return self.next_ui
 
 
