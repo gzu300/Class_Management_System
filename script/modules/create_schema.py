@@ -35,7 +35,7 @@ class Teacher(Base):
     __tablename__ = "teacher"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(20), nullable=False, unique=True)
+    name = Column(String(50), nullable=False, unique=True)
 
 class Lesson(Base):
     '''
@@ -46,25 +46,25 @@ class Lesson(Base):
     __tablename__ = 'lesson'
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(10), nullable=False, unique=True)
+    name = Column(String(50), nullable=False, unique=True)
 
-    course = relationship('Course', secondary='section', backref='lesson')
+    course = relationship('Course', secondary='section', backref='lesson', collection_class=set)
 
 class Course(Base):
     __tablename__ = 'course'
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(10), nullable=False, unique=True)
+    name = Column(String(50), nullable=False, unique=True)
 
-    student = relationship('Student', secondary='student_m2m_course', backref='course')
-    teacher = relationship('Teacher', secondary=Tea_Courses, backref='course')#lazy='joined' makes the relationship query a joined table with original tables. to be verified.
+    student = relationship('Student', secondary='student_m2m_course', backref='course', collection_class=set)
+    teacher = relationship('Teacher', secondary=Tea_Courses, backref='course', collection_class=set)#lazy='joined' makes the relationship query a joined table with original tables. to be verified.
 
 class Student(Base):
     #left
     __tablename__ = 'student'
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(20), nullable=False)
+    name = Column(String(50), nullable=False)
     email = Column(String(50), nullable=False, unique=True)
 
     # section = relationship('Attendance', back_populates='student')
@@ -86,9 +86,9 @@ class Attendance(Base):
     section_id = Column(Integer, ForeignKey('section.id'), primary_key=True)
 
     student = relationship(Student, backref=backref('attendance',
-                                                    cascade='all, delete-orphan'))
+                                                    cascade='all, delete-orphan'), collection_class=set)
     section = relationship('Section', backref=backref('attendance',
-                                                    cascade='all, delete-orphan'))
+                                                    cascade='all, delete-orphan'), collection_class=set)
 
     def __init__(self, student=None, section=None):
         self.student=student

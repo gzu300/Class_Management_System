@@ -91,7 +91,7 @@ class ExternalUIFactory(AbstractUI):
 class AuthFactory(ExternalUIFactory):
 
     def generate_next_ui(self):
-        existed = self._mngr.query(ExternalUIFactory.role)
+        existed = self._mngr.query()
         if existed:
             self.next_ui = 'TeacherView'
             return
@@ -102,12 +102,12 @@ class AuthFactory(ExternalUIFactory):
 
 class QueryFactory(ExternalUIFactory):
     def generate_next_ui(self):
-        result = self._mngr.query(self._user_response)
+        result = self._mngr.query()
         print(result)
 
 class AddFactory(ExternalUIFactory):
     def generate_next_ui(self):
-        result = self._mngr.add(self._user_response)
+        result = self._mngr.add()
         print(result)
 
     def run(self):
@@ -143,9 +143,9 @@ Add_student = AddFactory('TeacherView', 'Student', 'Course')
 Add_lesson = AddFactory('TeacherView', 'Lesson', 'Course')
 
 Search_course = QueryFactory('TeacherView', 'Course')
-# Search_student = TeacherUIFactory('query', 'Students')
+Search_student = QueryFactory('TeacherView', 'Student', 'Course')
 # Search_lesson = TeacherUIFactory('query', 'Lessons')
-# Search_attendance = TeacherUIFactory('query', 'Attendances')
+Search_attendance = QueryFactory('TeacherView', 'Course', 'Lesson', 'Student')
 # Search_score = TeacherUIFactory('query', 'Scores')
 
 #Students
@@ -206,13 +206,13 @@ def application(ui):
         'Search_course': Search_course,
 
         'Add_student': Add_student,
-        # 'Search_student': Search_student,
+        'Search_student': Search_student,
 
-        # 'Add_lesson': Add_lesson,
+        'Add_lesson': Add_lesson,
         # # 'Search_lesson': Search_lesson,
 
         # 'Add_attendance': Add_attendance,
-        # 'Search_attendance': Search_attendance,
+        'Search_attendance': Search_attendance,
 
         # 'Add_score': Add_score,
         # 'Search_score': Search_score,

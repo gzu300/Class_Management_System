@@ -43,15 +43,15 @@ class BaseEntity(ABC):
     def _get_student(self, columns):
         return self.session.query(Student).filter_by(**columns)
 
-    def _get_course_instance(self, course_name):
-        return self.session.query(Course).filter(Course.name==course_name).one_or_none()
+    def _get_course(self, columns):
+        return self.session.query(Course).filter_by(**columns)
 
     def _get_section(self, course_name, lesson_name):
         section_subquery_stmt = self.session.query(
             Course.id.label('course_id'), Lesson.id.label('lesson_id')
         ).filter(Course.name==course_name, Lesson.name==lesson_name).subquery()
 
-        section, *_ = self.session.query(Section, section_subquery_stmt).\
+        section = self.session.query(Section).\
             filter(
                 Section.courses_id==section_subquery_stmt.c.course_id,
                 Section.lessons_id==section_subquery_stmt.c.lesson_id
@@ -67,6 +67,16 @@ class BaseEntity(ABC):
                 Attendance.stu_id==student_subquery.id
             )
         return attendance
+
+    def _get_sections_from_course(self, course_name):
+
+        section_subquery_stmt = self.session.query(Course.id.label('course_id')).\
+            filter(Course.name==course_name).subquery()
+        section_stmt_list = self.session.query(Section, section_subquery_stmt).\
+            filter(Section.courses_id==section_subquery_stmt.c.course_id).all() 
+        section_list = [section for section, stmt in section_stmt_list]
+        
+        return section_list
 
     def _query_raw(self):
         student_columns = self._user_response['Student']
@@ -97,38 +107,34 @@ class StudentMngr(BaseEntity):
         query section where 'course' name is the same as student.course; Note: There are multiple instances;
         append section to student in order to update attendance.
         '''
-        student = self._user_response['Student']
-        course_name = self._user_response['Course']['name']
+        student_c = self._user_response['Student']
+        course_c = self._user_response['Course']
+        course_name = course_c['name']
 
-        new_entry_exist = self._check_entry_existance('Student', 'email')
-        if new_entry_exist:
-            return 'Student name: {1}, email: {0} already existed.'.format(student['email'], student['name'])
+        student_q = self._get_student(student_c)
+        course_q = self._get_course(course_c)
 
-        course = self._get_course_instance(course_name)
-        if not course:
+        #exit when the course does not exist
+        if not course_q.one_or_none():
             return f'Course {course_name} does not exist.'
+        #exit when the student, the course exist and they already related
+        student_course_exist = student_q.join(Student.course).filter(Course.name==course_name).one_or_none()
+        if student_course_exist:
+            return 'Student name: {1}, email: {0} already existed.'.format(student_c['email'], student_c['name'])
+
 
         section_list = self._get_sections_from_course(course_name)
-        if not section_list:
-            return f'Course {course_name} has no registered lessons.'
+        student = student_q.one_or_none()
+        course = course_q.one_or_none()
 
-        student = Student(**student)
-        student.course = [course]
-        student.section = section_list
+        if not student:
+            student = Student(**student_c)
+        student.course.append(course)
+        for each in section_list:
+            student.section.add(each)
         self.session.add(student)
         self.session.commit()
         return student
-    
-    def _get_sections_from_course(self, course_name):
-
-        section_subquery_stmt = self.session.query(Course.id.label('course_id')).\
-            filter(Course.name==course_name).subquery()
-        section_stmt_list = self.session.query(Section, section_subquery_stmt).\
-            filter(Section.courses_id==section_subquery_stmt.c.course_id).all() 
-        section_list = [section for section, stmt in section_stmt_list]
-        
-        return section_list
-
     
 
 class TeacherMngr(BaseEntity):
@@ -138,9 +144,12 @@ class TeacherMngr(BaseEntity):
 class CourseMngr(BaseEntity):
     def add(self):
         course = self._user_response['Course']
-        course = Course(**course)
-        self.session.add(course)
-        self.session.commit()
+        if not self._check_entry_existance('Course', 'name'):
+            course = Course(**course)
+            self.session.add(course)
+            self.session.commit()
+            return course
+        return 'Course {0} already exist.'.format(course['name'])
 
     def query(self):
         course_name = self._user_response['Course']
@@ -160,33 +169,41 @@ class LessonMngr(BaseEntity):
         append students to section so that attendance is added.
         '''
         lesson = self._user_response['Lesson']
-        course_name = self._user_response['Course']['name']
+        course_name = self._user_response['Course']
 
         new_entry_exist = self._check_entry_existance('Lesson', 'name')
         if new_entry_exist:
             return 'lesson {0} already exist'.format(lesson['name'])
 
-        course = self._get_course_instance(course_name)
+        course = self._get_course(course_name).one_or_none()
         if not course:
             return f'course {course_name} does not exist.'
 
-        section, student_list = self._get_students_section_from_course(course_name, lesson['name'])
+
+        lesson = Lesson(**lesson)
+        lesson.course.add(course)
+        section, student_list = self._get_students_section_from_course(course_name['name'], lesson['name'])
+
         if not student_list:
             return f'Course {course_name} has no registered students.'
 
-        lesson = Lesson(**lesson)
-        lesson.course = [course]
-        section.student = student_list
+        for each in student_list:
+            section.student.add(each)
         self.session.add(lesson)
         self.session.commit()
         return lesson
 
     def _get_students_section_from_course(self, course_name, lesson_name):
-
+        '''
+        This is a special method only used in LessonMngr. Since relationship is between student and Section, which
+        itself is a relationship as well, whenever we added a new lesson entry we need to retrieve the newly generated
+        section and existed student. Only then we could buid relationship between student and section.
+        Therefore this method returns two result, list of student and section for the add method above.
+        '''
         student_list = self.session.query(Student).join(Student.course).\
             filter(Course.name==course_name).all()
 
-        section = self._get_section(course_name, lesson_name)
+        section = self._get_section(course_name, lesson_name).one_or_none()
         
         return (section, student_list)
 
@@ -228,7 +245,7 @@ class ScoreMngr(BaseEntity):
         self.session.commit()
         return attendance
 
-    def query(self):
+    def query_rank(self):
         '''
         order student.name and student.score by score according to course.
         '''
@@ -237,21 +254,41 @@ class ScoreMngr(BaseEntity):
         # lesson_name = self._user_response['Lesson']['name']
 
         # student = self._get_student(student_columns)
-        # course = self._get_course_instance(course_name)
+        # course = self._get_course(course_name)
         # lesson = self._get_lesson(lesson_name).one_or_none()
         # section = self._get_section(course_name, lesson_name)
         # attendance = self._get_attendance(student, section)
+        stmt_raw = self.session.query(
+            Course.name.label('course_name'),
+            Section.id.label('section_id'),
+            Student.name.label('student_name'),
+            Student.id.label('student_id'),
+            Student.email.label('email')
+        ).join(
+            Course.student
+        ).filter(
+            Section.courses_id==Course.id
+        )
 
-        course = self.session.query(Course.id, Student.name.label('student_name')).filter(Course.name==course_name).subquery()
+        stmt = stmt_raw.subquery()
 
+        result = self.session.query(
+            func.avg(Attendance.score).label('average_score'), 
+            stmt.c.course_name, 
+            stmt.c.student_name, 
+            stmt.c.email
+        ).filter(
+            Attendance.stu_id==stmt.c.student_id,
+            Attendance.section_id==stmt.c.section_id
+        ).group_by(
+            stmt.c.course_name,
+            stmt.c.student_name
+        ).order_by(
+            stmt.c.course_name,
+            'average_score'
+        )
 
-        section = self.session.query(Section.id.label('section_id'), Course.name.label('course_name'), course.c.student_name.label('student_name')).\
-            filter(Section.courses_id==course.c.id).subquery()
-
-        result = self.session.query(Attendance.score, section.c.course_name, section.c.student_name).\
-            join(section, Attendance.section_id==section.c.section_id)
-
-        print(self._to_df(result))
+        return self._to_df(result)
 
         
 
@@ -278,25 +315,7 @@ def query_student(obj, **kwargs):
 
 
 if __name__ == '__main__':
-    a = ScoreMngr({'Course': {'name': 'python'}})
-    print(a.query())
-
-    # course = CourseMngr()
-    # student = StudentMngr()
-    # lesson = LessonMngr()
-    # course.add({'Course':{'name': 'python'}})
-
-    # student.add({'Student': {'email': 'zhu.com', 'name': 'zhu'}, 'Course': {'name': 'python'}})
-    
-    # # added a new lesson
-    # lesson.add({'Lesson': {'name': 'day1'}, 'Course':{'name': 'python'}})
-
-    # # add another new student
-    # student.add({'Student': {'email': 'xia.com', 'name': 'xia'}, 'Course': {'name': 'python'}})
-
-    # if students, lessons in different courses affect with each other  
-    # course.add({'Course':{'name': 'linux'}})
-    # student.add({'Student': {'email': '1.com', 'name': '1'}, 'Course': {'name': 'linux'}})
-    # lesson.add({'Lesson': {'name': '3rd'}, 'Course':{'name': 'linux'}})
+    a = CourseMngr({'Coure': {'name': 'python'}})
+    a.session.delete(None)
 
 
