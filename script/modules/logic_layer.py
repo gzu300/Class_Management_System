@@ -46,6 +46,9 @@ class BaseEntity(ABC):
     def _get_course(self, columns):
         return self.session.query(Course).filter_by(**columns)
 
+    def _get_lesson(self, columns):
+        return self.session.query(Lesson).filter_by(**columns)
+
     def _get_section(self, course_name, lesson_name):
         section_subquery_stmt = self.session.query(
             Course.id.label('course_id'), Lesson.id.label('lesson_id')
@@ -61,10 +64,10 @@ class BaseEntity(ABC):
     def _get_attendance(self, student, section):
         student_subquery = student.subquery()
         section_subquery = section.subquery()
-        attendance, *_ = self.session.query(Attendance, student_subquery, section_subquery).\
+        attendance = self.session.query(Attendance, student_subquery, section_subquery).\
             filter(
-                Attendance.section_id==section_subquery.id,
-                Attendance.stu_id==student_subquery.id
+                Attendance.section_id==section_subquery.c.id,
+                Attendance.stu_id==student_subquery.c.id
             )
         return attendance
 
@@ -78,6 +81,11 @@ class BaseEntity(ABC):
         
         return section_list
 
+    def _get_students_from_course(self, course_name):
+        student_list = self.session.query(Student).join(Student.course).\
+            filter(Course.name==course_name).all()
+        return student_list
+
     def _query_raw(self):
         student_columns = self._user_response['Student']
         course_name = self._user_response['Course']['name']
@@ -89,7 +97,7 @@ class BaseEntity(ABC):
         section = self._get_section(course_name, lesson_name)
         if not section.one_or_none():
             return f'Error. {course_name} and/or {lesson_name} registered.'
-        return self._get_attendance(student, section)
+        return self._get_attendance(student, section) #a query object
         
 
     def _to_df(self, query_obj):
@@ -136,6 +144,59 @@ class StudentMngr(BaseEntity):
         self.session.commit()
         return student
     
+class LessonMngr(BaseEntity):
+    def add(self):
+        '''
+        logic:
+        create a new lesson instance;
+        add relationship with the 'course';
+        query section with combined 'lesson' and 'course' instances. Note: there should be only one queried instance.
+        query student which has the same 'course' name. Note: there are multiple student instances.
+        append students to section so that attendance is added.
+        '''
+        lesson_c = self._user_response['Lesson']
+        course_c = self._user_response['Course']
+        course_name = course_c['name']
+
+        course_q = self._get_course(course_c)
+        lesson_q = self._get_lesson(lesson_c)
+
+        if not course_q.one_or_none():
+            return f'Course {course_name} does not exist.'
+
+        lesson_course_exist = lesson_q.join(Lesson.course).filter(Course.name==course_name).one_or_none()
+        if lesson_course_exist:
+            return 'Lesson {1} for Course {0} already existed.'.format(course_name, lesson_c['name'])
+
+
+
+        student_list = self._get_students_from_course(course_name)
+        course = course_q.one_or_none()
+        lesson = lesson_q.one_or_none()
+
+        if not lesson:
+            lesson = Lesson(**lesson_c)
+        lesson.course.add(course)
+        section = self._get_section(course_c['name'], lesson_c['name']).one_or_none()
+        for each in student_list:
+            section.student.append(each)
+        self.session.add(lesson)
+        self.session.commit()
+        return lesson
+
+    def _get_students_section_from_course(self, course_name, lesson_name):
+        '''
+        This is a special method only used in LessonMngr. Since relationship is between student and Section, which
+        itself is a relationship as well, whenever we added a new lesson entry we need to retrieve the newly generated
+        section and existed student. Only then we could buid relationship between student and section.
+        Therefore this method returns two result, list of student and section for the add method above.
+        '''
+        student_list = self.session.query(Student).join(Student.course).\
+            filter(Course.name==course_name).all()
+
+        section = self._get_section(course_name, lesson_name).one_or_none()
+        
+        return (section, student_list)
 
 class TeacherMngr(BaseEntity):
     def query(self):
@@ -158,54 +219,6 @@ class CourseMngr(BaseEntity):
         return self._to_df(result)
         
 
-class LessonMngr(BaseEntity):
-    def add(self):
-        '''
-        logic:
-        create a new lesson instance;
-        add relationship with the 'course';
-        query section with combined 'lesson' and 'course' instances. Note: there should be only one queried instance.
-        query student which has the same 'course' name. Note: there are multiple student instances.
-        append students to section so that attendance is added.
-        '''
-        lesson = self._user_response['Lesson']
-        course_name = self._user_response['Course']
-
-        new_entry_exist = self._check_entry_existance('Lesson', 'name')
-        if new_entry_exist:
-            return 'lesson {0} already exist'.format(lesson['name'])
-
-        course = self._get_course(course_name).one_or_none()
-        if not course:
-            return f'course {course_name} does not exist.'
-
-
-        lesson = Lesson(**lesson)
-        lesson.course.add(course)
-        section, student_list = self._get_students_section_from_course(course_name['name'], lesson['name'])
-
-        if not student_list:
-            return f'Course {course_name} has no registered students.'
-
-        for each in student_list:
-            section.student.add(each)
-        self.session.add(lesson)
-        self.session.commit()
-        return lesson
-
-    def _get_students_section_from_course(self, course_name, lesson_name):
-        '''
-        This is a special method only used in LessonMngr. Since relationship is between student and Section, which
-        itself is a relationship as well, whenever we added a new lesson entry we need to retrieve the newly generated
-        section and existed student. Only then we could buid relationship between student and section.
-        Therefore this method returns two result, list of student and section for the add method above.
-        '''
-        student_list = self.session.query(Student).join(Student.course).\
-            filter(Course.name==course_name).all()
-
-        section = self._get_section(course_name, lesson_name).one_or_none()
-        
-        return (section, student_list)
 
 
 class AttendanceMngr(BaseEntity):
@@ -216,19 +229,22 @@ class AttendanceMngr(BaseEntity):
 
     def update(self):
         
-        attendance = self._query_raw().one_or_none()
+        attendance = self._query_raw()
         if isinstance(attendance, str):
             return attendance
-
-        attendance.attend = self._user_response['Attendance']['attend']
+        attendance, *_ = attendance.one_or_none()
+        attendance.attend = bool(self._user_response['Attendance']['attend'])
         self.session.commit()
         return attendance
         
 
 
     def query(self):
-        attendance = self._query_raw().statement
-        df = self._to_df(attendance)
+        attendance = self._query_raw()
+        if isinstance(attendance, str):
+            return attendance
+        attendance, *_ = attendance.one_or_none()
+        df = self._to_df(attendance.statement)
         if df.empty:
             return 'Combination of lesson, course and student not found.'
         return df
@@ -237,7 +253,7 @@ class AttendanceMngr(BaseEntity):
 class ScoreMngr(BaseEntity):
     def update(self):
         
-        attendance = self._query_raw().one_or_none()
+        attendance = self._query_raw().one_or_none()#need student, course, lesson
         if isinstance(attendance, str):
             return attendance
 

@@ -82,8 +82,8 @@ class Attendance(Base):
     score =  Column(Integer, nullable=True)
     attend = Column(Boolean, nullable=True)
 
-    stu_id = Column(Integer, ForeignKey('student.id'), primary_key=True)
-    section_id = Column(Integer, ForeignKey('section.id'), primary_key=True)
+    stu_id = Column(Integer, ForeignKey('student.id', ondelete="CASCADE"), primary_key=True)
+    section_id = Column(Integer, ForeignKey('section.id', ondelete="CASCADE"), primary_key=True)
 
     student = relationship(Student, backref=backref('attendance',
                                                     cascade='all, delete-orphan'), collection_class=set)
@@ -93,9 +93,6 @@ class Attendance(Base):
     def __init__(self, student=None, section=None):
         self.student=student
         self.section=section
-        # self.homework=homework
-        # self.score=score
-        # self.attend=attend
 
 
 
@@ -107,8 +104,8 @@ class Section(Base):
     '''
     __tablename__ = 'section'
     id = Column(Integer, primary_key=True)
-    courses_id =  Column(Integer, ForeignKey('course.id'))
-    lessons_id = Column(Integer, ForeignKey('lesson.id'))
+    courses_id =  Column(Integer, ForeignKey('course.id', ondelete="CASCADE"))
+    lessons_id = Column(Integer, ForeignKey('lesson.id', ondelete="CASCADE"))
 
     student = association_proxy('attendance', 'student', creator=lambda stu: Attendance(student=stu))
 
