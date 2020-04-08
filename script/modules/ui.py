@@ -2,8 +2,7 @@
 from abc import ABC, abstractclassmethod
 import sys
 import pandas as pd
-from .logic_layer import Test
-from .logic_layer_new import *
+from .logic_layer import *
 
 '''
 This script deploys the factory pattern.
@@ -110,10 +109,20 @@ class AddFactory(ExternalUIFactory):
         result = self._mngr.add()
         print(result)
 
-    def run(self):
-        self.get_user_response()
-        self.generate_next_ui()
-        return self.next_ui
+class UpdateFactory(ExternalUIFactory):
+    def get_user_response(self):
+        main_table, main_column, *others = self._args
+        main_table_response = input(f'Enter {main_table} \'s {main_column} information: ')
+        self._user_response = {main_table: {main_column: main_table_response}}
+        related_table_response = gather_multiple_responses(others)
+        self._user_response.update(related_table_response)
+        self._mngr = eval(main_table+'Mngr')(self._user_response)
+
+        return self._user_response
+
+    def generate_next_ui(self):
+        result = self._mngr.update()
+        print(result)
 
 
 
@@ -141,6 +150,7 @@ TeacherLogin = AuthFactory('TeacherView', 'Teacher')
 Add_course = AddFactory('TeacherView', 'Course')
 Add_student = AddFactory('TeacherView', 'Student', 'Course')
 Add_lesson = AddFactory('TeacherView', 'Lesson', 'Course')
+Add_attendance = UpdateFactory('TeacherView', 'Attendance', 'attend', 'Course', 'Lesson', 'Student')
 
 Search_course = QueryFactory('TeacherView', 'Course')
 Search_student = QueryFactory('TeacherView', 'Student', 'Course')
@@ -211,7 +221,7 @@ def application(ui):
         'Add_lesson': Add_lesson,
         # # 'Search_lesson': Search_lesson,
 
-        # 'Add_attendance': Add_attendance,
+        'Add_attendance': Add_attendance,
         'Search_attendance': Search_attendance,
 
         # 'Add_score': Add_score,
