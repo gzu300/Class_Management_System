@@ -18,6 +18,8 @@ SHITTY LOGIC RETRIEVEING COLUMNS AND RELATED COLUMNS, EXIPLICITILY EACH OPERATIO
 DIFFERENT TABLES IS MORE FEASIBLE AND CLEAR.
 
 THIS IS THE LESSON TO BE LEARNED!!!!!
+
+
 '''
 
 class BaseEntity(ABC):
@@ -51,10 +53,11 @@ class BaseEntity(ABC):
 
     def _get_section(self, course_name, lesson_name):
         section_subquery_stmt = self.session.query(
-            Course.id.label('course_id'), Lesson.id.label('lesson_id')
+            Course.id.label('course_id'), Lesson.id.label('lesson_id'),
+            Course.name.label('course_name'), Lesson.name.label('lesson_name')
         ).filter(Course.name==course_name, Lesson.name==lesson_name).subquery()
 
-        section = self.session.query(Section).\
+        section = self.session.query(Section, section_subquery_stmt.c.course_name.label('course_name'), section_subquery_stmt.c.lesson_name.label('lesson_name')).\
             filter(
                 Section.courses_id==section_subquery_stmt.c.course_id,
                 Section.lessons_id==section_subquery_stmt.c.lesson_id
@@ -64,12 +67,25 @@ class BaseEntity(ABC):
     def _get_attendance(self, student, section):
         student_subquery = student.subquery()
         section_subquery = section.subquery()
-        attendance = self.session.query(Attendance, student_subquery, section_subquery).\
+        attendance = self.session.query(Attendance, student_subquery, section_subquery.c.course_name, section_subquery.c.lesson_name).\
             filter(
                 Attendance.section_id==section_subquery.c.id,
                 Attendance.stu_id==student_subquery.c.id
             )
         return attendance
+
+    def _query_raw(self):
+        student_columns = self._user_response['Student']
+        course_name = self._user_response['Course']['name']
+        lesson_name = self._user_response['Lesson']['name']
+
+        student = self._get_student(student_columns)
+        if not student.one_or_none():
+            return 'Error. Student: {0}, email: {1} not found.'.format(student['name'], student['email'])
+        section = self._get_section(course_name, lesson_name)
+        if not section.one_or_none():
+            return f'Error. {course_name} and/or {lesson_name} registered.'
+        return self._get_attendance(student, section) #a query object
 
     def _get_sections_from_course(self, course_name):
 
@@ -86,18 +102,6 @@ class BaseEntity(ABC):
             filter(Course.name==course_name).all()
         return student_list
 
-    def _query_raw(self):
-        student_columns = self._user_response['Student']
-        course_name = self._user_response['Course']['name']
-        lesson_name = self._user_response['Lesson']['name']
-
-        student = self._get_student(student_columns)
-        if not student.one_or_none():
-            return 'Error. Student: {0}, email: {1} not found.'.format(student['name'], student['email'])
-        section = self._get_section(course_name, lesson_name)
-        if not section.one_or_none():
-            return f'Error. {course_name} and/or {lesson_name} registered.'
-        return self._get_attendance(student, section) #a query object
         
 
     def _to_df(self, query_obj):
@@ -139,10 +143,13 @@ class StudentMngr(BaseEntity):
             student = Student(**student_c)
         student.course.append(course)
         for each in section_list:
-            student.section.add(each)
+            student.section.append(each)
         self.session.add(student)
         self.session.commit()
         return student
+
+    def query(self):
+        return self._check_entry_existance('Student', 'email')
     
 class LessonMngr(BaseEntity):
     def add(self):
@@ -177,12 +184,15 @@ class LessonMngr(BaseEntity):
         if not lesson:
             lesson = Lesson(**lesson_c)
         lesson.course.add(course)
-        section = self._get_section(course_c['name'], lesson_c['name']).one_or_none()
+        section = self._get_section(course_c['name'], lesson_c['name']).one_or_none()[0]
         for each in student_list:
             section.student.append(each)
         self.session.add(lesson)
         self.session.commit()
         return lesson
+
+    def query(self):
+        pass
 
     def _get_students_section_from_course(self, course_name, lesson_name):
         '''
@@ -221,82 +231,73 @@ class CourseMngr(BaseEntity):
 
 
 
-class AttendanceMngr(BaseEntity):
+class AttendanceBaseMngr(BaseEntity):
     '''
     attendance is added automatically whenever there is a new 'lesson' or 'student' instance.
     ''' 
     
 
-    def update(self):
+    def _update(self, column, value, func):
         
         attendance = self._query_raw()
         if isinstance(attendance, str):
             return attendance
         attendance, *_ = attendance.one_or_none()
-        attendance.attend = bool(self._user_response['Attendance']['attend'])
+        setattr(attendance, value, func(self._user_response[column][value]))
         self.session.commit()
         return attendance
-        
+
+    def _query(self, column):
+        attendance = self._query_raw()
+        if isinstance(attendance, str):
+            return attendance
+        att_sub = attendance.subquery()
+        attendance = self.session.query(getattr(att_sub.c, column), att_sub.c.name, att_sub.c.email, att_sub.c.course_name, att_sub.c.lesson_name)
+        df = self._to_df(attendance)
+        return df
+
+class AttendanceMngr(AttendanceBaseMngr):
+    def update(self):
+        return self._update('Attendance', 'attend', int)
+
+    def query(self):
+        return self._query('attend')
+
+
+class ScoreMngr(AttendanceBaseMngr):
+    
+    def update(self):
+        return self._update('Score', 'score', int)
 
 
     def query(self):
-        attendance = self._query_raw()
-        if isinstance(attendance, str):
-            return attendance
-        attendance, *_ = attendance.one_or_none()
-        df = self._to_df(attendance.statement)
-        if df.empty:
-            return 'Combination of lesson, course and student not found.'
-        return df
-
-
-class ScoreMngr(BaseEntity):
-    def update(self):
-        
-        attendance = self._query_raw().one_or_none()#need student, course, lesson
-        if isinstance(attendance, str):
-            return attendance
-
-        attendance.score = self._user_response['Attendance']['attend']
-        self.session.commit()
-        return attendance
-
-    def query_rank(self):
         '''
         order student.name and student.score by score according to course.
         '''
         course_name = self._user_response['Course']['name']
-        stmt_raw = self.session.query(
-            Course.name.label('course_name'),
-            Section.id.label('section_id'),
-            Student.name.label('student_name'),
-            Student.id.label('student_id'),
-            Student.email.label('email')
-        ).join(
-            Course.student
-        ).filter(
-            Section.courses_id==Course.id
-        )
+        lesson_name = self._user_response['Lesson']['name']
+        
+        section = self._get_section(course_name, lesson_name)
+        student = self.session.query(Student) # select all the students
+        attendance = self._get_attendance(student, section).subquery()
+        rank = self.session.query(
+            attendance.c.score,
+            attendance.c.name,
+            attendance.c.email,
+            attendance.c.course_name,
+            attendance.c.lesson_name
+        ).order_by(attendance.c.score.desc())
 
-        stmt = stmt_raw.subquery()
+        return self._to_df(rank)    
 
-        result = self.session.query(
-            func.avg(Attendance.score).label('average_score'), 
-            stmt.c.course_name, 
-            stmt.c.student_name, 
-            stmt.c.email
-        ).filter(
-            Attendance.stu_id==stmt.c.student_id,
-            Attendance.section_id==stmt.c.section_id
-        ).group_by(
-            stmt.c.course_name,
-            stmt.c.student_name
-        ).order_by(
-            stmt.c.course_name,
-            'average_score'
-        )
+class HomeworkMngr(AttendanceBaseMngr):
+    def update(self):
+        return self._update('Homework', 'homework', str)
 
-        return self._to_df(result)
+    def query(self):
+        return self._query('homework')
+
+    
 
         
 
@@ -323,7 +324,5 @@ def query_student(obj, **kwargs):
 
 
 if __name__ == '__main__':
-    a = CourseMngr({'Coure': {'name': 'python'}})
-    a.session.delete(None)
-
+    pass
 

@@ -1,10 +1,11 @@
 import unittest
-from .modules.logic_layer import LessonMngr, StudentMngr, CourseMngr, AttendanceMngr, initialize
+from .modules.logic_layer import LessonMngr, StudentMngr, CourseMngr, AttendanceMngr, HomeworkMngr, ScoreMngr, initialize
 from .modules.create_schema import Session, Student, Course, Lesson, Section, Attendance
 from .conf.setting import engine
 from sqlalchemy.orm.exc import UnmappedInstanceError
 from sqlalchemy.sql import exists
 from sqlalchemy import and_
+import pandas as pd
 
 class TestLesson(unittest.TestCase):
     def setUp(self):
@@ -160,8 +161,96 @@ class TestCourse(unittest.TestCase):
         self.assertEqual(second, 'Course python_test1 already exist.')
 
     def tearDown(self):
-        result = self.session.query(Course).filter(Course.name==self._user_response['Course']['name']).first()
+        result = self.session.query(Course).filter(Course.name=='python_test1').first()
         self.session.delete(result)
+        self.session.commit()
+
+class TestAttendance(unittest.TestCase):
+    def setUp(self):
+        initialize()
+        self.session = Session(bind=engine)
+
+    def test_add_and_query_attendance(self):
+        course = CourseMngr({'Course': {'name': 'python_test1'}})
+        course.add()
+        user_response1 = {'Student': {'name': 'zhu', 'email': 'zhu.com'},  'Course': {'name': 'python_test1'}}
+        student1 = StudentMngr(user_response1)
+        student1.add()
+        user_response1 = {'Lesson': {'name': 'test_day1'}, 'Course': {'name': 'python_test1'}}
+        lesson1 = LessonMngr(user_response1)
+        lesson1.add()
+        user_response = {'Course': {'name': 'python_test1'},
+                        'Student': {'name': 'zhu', 'email': 'zhu.com'},
+                        'Lesson': {'name': 'test_day1'},
+                        'Attendance': {'attend': '1'}}
+        attendance = AttendanceMngr(user_response)
+        result = attendance.update()
+        self.assertEqual(result.attend, 1)
+        query_result = attendance.query().iloc[0, :].values.tolist()
+        query_answer = [True, 'zhu', 'zhu.com', 'python_test1', 'test_day1']
+        self.assertEqual(query_result, query_answer)
+
+
+    def tearDown(self):
+        try:
+            result1 = self.session.query(Course).filter(Course.name=='python_test1').first()
+            self.session.delete(result1)
+        except UnmappedInstanceError:
+            pass
+        try:
+            result2 = self.session.query(Lesson).filter(Lesson.name=='test_day1').first()
+            self.session.delete(result2)
+        except UnmappedInstanceError:
+            pass
+        try:
+            student1 = self.session.query(Student).filter(Student.email=='zhu.com').first()
+            self.session.delete(student1)
+        except UnmappedInstanceError:
+            pass
+        self.session.commit()
+
+class TestHomework(unittest.TestCase):
+    def setUp(self):
+        initialize()
+        self.session = Session(bind=engine)
+
+    def test_add_and_query_homework(self):
+        course = CourseMngr({'Course': {'name': 'python_test1'}})
+        course.add()
+        user_response1 = {'Student': {'name': 'zhu', 'email': 'zhu.com'},  'Course': {'name': 'python_test1'}}
+        student1 = StudentMngr(user_response1)
+        student1.add()
+        user_response1 = {'Lesson': {'name': 'test_day1'}, 'Course': {'name': 'python_test1'}}
+        lesson1 = LessonMngr(user_response1)
+        lesson1.add()
+        user_response = {'Course': {'name': 'python_test1'},
+                        'Student': {'name': 'zhu', 'email': 'zhu.com'},
+                        'Lesson': {'name': 'test_day1'},
+                        'Homework': {'homework': '1'}}
+        attendance = HomeworkMngr(user_response)
+        result = attendance.update()
+        self.assertEqual(result.homework, '1')
+        query_result = attendance.query().iloc[0, :].values.tolist()
+        query_answer = ['1', 'zhu', 'zhu.com', 'python_test1', 'test_day1']
+        self.assertEqual(query_result, query_answer)
+
+
+    def tearDown(self):
+        try:
+            result1 = self.session.query(Course).filter(Course.name=='python_test1').first()
+            self.session.delete(result1)
+        except UnmappedInstanceError:
+            pass
+        try:
+            result2 = self.session.query(Lesson).filter(Lesson.name=='test_day1').first()
+            self.session.delete(result2)
+        except UnmappedInstanceError:
+            pass
+        try:
+            student1 = self.session.query(Student).filter(Student.email=='zhu.com').first()
+            self.session.delete(student1)
+        except UnmappedInstanceError:
+            pass
         self.session.commit()
 
 if __name__ == '__main__':

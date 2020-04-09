@@ -110,21 +110,3 @@ class Section(Base):
     student = association_proxy('attendance', 'student', creator=lambda stu: Attendance(student=stu))
 
 Base.metadata.create_all(engine)
-
-if __name__ == '__main__':
-    session = Session(bind=engine)
-    # python = Course(name='python')
-    # linux = Course(name='linux')
-
-    # python.student = [Student(email='zhu.com', name='zhu'), Student(email='xia.com', name='xia')]
-    python = session.query(Course).filter(Course.name=='python').first()
-    python.lesson.append(Lesson(name='day1'))
-
-    stmt = session.query(Course.id.label('course_id'), Lesson.id.label('lesson_id')).filter(and_(Course.name=='python', Lesson.name=='day1')).subquery()
-    section, *_ = session.query(Section, stmt).filter(and_(Section.courses_id==stmt.c.course_id, Section.lessons_id==stmt.c.lesson_id)).first()
-
-    student = session.query(Student).options(subqueryload(Student.course)).filter(Course.name=='python').all()
-    for each in student:
-        section.student.append(each)
-    session.add_all([section])
-    session.commit()

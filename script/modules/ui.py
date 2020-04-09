@@ -91,15 +91,19 @@ class AuthFactory(ExternalUIFactory):
 
     def generate_next_ui(self):
         existed = self._mngr.query()
-        if existed:
-            self.next_ui = 'TeacherView'
-            return
-        self.next_ui = 'Welcome'
+        if not existed:
+            self.next_ui = 'Welcome'
 
     def get_user_response(self):
         ExternalUIFactory.role = ExternalUIFactory.get_user_response(self)
 
 class QueryFactory(ExternalUIFactory):
+    def get_user_response(self):
+        main_table, *others = self._args
+        self._user_response = gather_multiple_responses(others) #funcs in logic layer
+        self._mngr = eval(main_table+'Mngr')(self._user_response)
+        return self._user_response
+
     def generate_next_ui(self):
         result = self._mngr.query()
         print(result)
@@ -132,13 +136,13 @@ class UpdateFactory(ExternalUIFactory):
 
 Welcome = InternalUIFactory({'1': 'TeacherLogin', '2': 'StudentLogin', 'q': 'Quit'})
 Teacher_view = InternalUIFactory({'1': 'Student', '2': 'Course', '3': 'Lesson', '4': 'Attendance', '5': 'Score', 'q': 'Quit'})
-Student_view = InternalUIFactory({'1': 'Homework'})
+Student_view = InternalUIFactory({'1': 'Homework', 'b': 'Back'})
 Student_op = InternalUIFactory({'1': 'Add_student', '2': 'Search_student', 'b': 'Back', 'q': 'Quit'})
 Course_op = InternalUIFactory({'1': 'Add_course', '2': 'Search_course', 'b': 'Back', 'q': 'Quit'})
 Lesson_op = InternalUIFactory({'1': 'Add_lesson', '2': 'Search_lesson', 'b': 'Back', 'q': 'Quit'})
 Attendance_op = InternalUIFactory({'1': 'Add_attendance', '2': 'Search_attendance', 'b': 'Back', 'q': 'Quit'})
 Score_op = InternalUIFactory({'1': 'Add_score', '2': 'Search_score', 'b': 'Back', 'q': 'Quit'})
-Homework_op = InternalUIFactory({'1': 'Add_homework'})
+Homework_op = InternalUIFactory({'1': 'Add_homework', '2': 'Search_score', 'q': 'Quit'})
 
 
 #####
@@ -151,17 +155,19 @@ Add_course = AddFactory('TeacherView', 'Course')
 Add_student = AddFactory('TeacherView', 'Student', 'Course')
 Add_lesson = AddFactory('TeacherView', 'Lesson', 'Course')
 Add_attendance = UpdateFactory('TeacherView', 'Attendance', 'attend', 'Course', 'Lesson', 'Student')
+Add_score = UpdateFactory('TeacherView', 'Score', 'score', 'Course', 'Lesson', 'Student')
 
 Search_course = QueryFactory('TeacherView', 'Course')
 Search_student = QueryFactory('TeacherView', 'Student', 'Course')
 # Search_lesson = TeacherUIFactory('query', 'Lessons')
-Search_attendance = QueryFactory('TeacherView', 'Course', 'Lesson', 'Student')
-# Search_score = TeacherUIFactory('query', 'Scores')
+Search_attendance = QueryFactory('TeacherView', 'Attendance','Course', 'Lesson', 'Student')
+
 
 #Students
-# StudentLogin = ExternalUIFactory('StudentView', 'query', 'Students')
+StudentLogin = AuthFactory('StudentView', 'Student')
 
-# Add_homework = ExternalUIFactory('StudentView', 'add', 'Homeworks')
+Add_homework = UpdateFactory('StudentView', 'Homework', 'homework', 'Course', 'Lesson', 'Student')
+Search_score = QueryFactory('StudentView', 'Score', 'Lesson', 'Course')
 
 #####
 #Misc functios and classes
@@ -210,7 +216,7 @@ def application(ui):
         'Homework': Homework_op,
 
         'TeacherLogin': TeacherLogin,
-        # 'StudentLogin': StudentLogin,
+        'StudentLogin': StudentLogin,
 
         'Add_course': Add_course,
         'Search_course': Search_course,
@@ -224,10 +230,11 @@ def application(ui):
         'Add_attendance': Add_attendance,
         'Search_attendance': Search_attendance,
 
-        # 'Add_score': Add_score,
-        # 'Search_score': Search_score,
+        'Add_score': Add_score,
+        'Search_score': Search_score,
 
-        # 'Add_homework': Add_homework,
+        'Add_homework': Add_homework,
+        # 'Search_homework': Search_homework,
 
         'Quit': Quit(),
         'Back': Back()
